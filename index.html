@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>RDFa-Lab</title>
+  </head>
+  <body>
+    <h1>RDFa-Lab</h1>
+    <section>
+      <h2>Bookmarklets</h2>
+      <p>Save these links as bookmarks:</p>
+      <ul>
+        <li>
+          <a href='javascript: void((function () { if(!document.getElementById("rdfa-json-boot")){ var s=document.createElement("script"); s.type="text/javascript"; s.id="rdfa-json-boot"; s.src="http://niklasl.github.com/rdfa-lab/js/rdfa-json.js"; s.onload = function () { var json = JSON.stringify(RDFaJSON.extract().data, null, 2).replace(/{\s+(\S+: "[^"]+")\s+}/gm, "{$1}").replace(/\[\s+(.+)\s+\]/gm, "[$1]"); window.location = "data:application/json," + encodeURIComponent(json); }; document.getElementsByTagName("head")[0].appendChild(s); } })());'
+            >RDFa to JSON-LD</a>
+        </li>
+      </ul>
+    </section>
+  </body>
+</html>
