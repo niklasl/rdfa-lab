@@ -39,11 +39,11 @@ var RDFaJSON;
         for (i = _i = 0, _ref2 = pfxs.length; _i <= _ref2; i = _i += 2) {
           pfx = pfxs[i];
           ns = pfxs[i + 1];
-          if ((_ref3 = attrs.lang) != null ? _ref3.value : void 0) {
-            ctxt.update(pfx, ns);
-          }
+          ctxt.update(pfx, ns);
         }
-        ctxt.update('@language', attrs.lang.value);
+        if ((_ref3 = attrs.lang) != null ? _ref3.value : void 0) {
+          ctxt.update('@language', attrs.lang.value);
+        }
       }
       if (attrs.resource != null) {
         next = {

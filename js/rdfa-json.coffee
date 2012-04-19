@@ -38,9 +38,9 @@
         for i in [0..pfxs.length] by 2
           pfx = pfxs[i]
           ns = pfxs[i+1]
-          ctxt.update(pfx, ns) if attrs.lang?.value
+          ctxt.update(pfx, ns)
         # TODO: if we reach a non-xml literal here, add to just that?
-        ctxt.update('@language', attrs.lang.value)
+        ctxt.update('@language', attrs.lang.value) if attrs.lang?.value
 
       # IMP: resolve against base?
       if attrs.resource?
