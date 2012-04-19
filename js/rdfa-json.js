@@ -83,7 +83,7 @@ var RDFaJSON;
             '@value': value
           };
           if (attrs.datatype.value) {
-            value['@datatype'] = attrs.datatype.value;
+            value['@type'] = attrs.datatype.value;
           }
         }
       }
@@ -95,7 +95,7 @@ var RDFaJSON;
             ctxt.update(type, vocab + type);
           }
         }
-        (next || current)['@typeof'] = types;
+        (next || current)['@type'] = types;
       }
       inlist = (attrs.inlist !== void 0) || (hanging.rel && hanging.inlist);
       if (value) {

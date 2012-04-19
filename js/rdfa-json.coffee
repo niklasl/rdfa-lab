@@ -72,14 +72,14 @@
         if attrs.datatype
           value = {'@value': value}
           if attrs.datatype.value
-            value['@datatype'] = attrs.datatype.value
+            value['@type'] = attrs.datatype.value
 
       if attrs.typeof
         types = attrs.typeof.value.split(/\s+/)
         for type in types
           if vocab and type.indexOf(':') == -1
             ctxt.update(type, vocab + type)
-        (next or current)['@typeof'] = types
+        (next or current)['@type'] = types
 
       inlist = (attrs.inlist != undefined) or (hanging.rel and hanging.inlist)
 
