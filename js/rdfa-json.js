@@ -2,37 +2,62 @@
 var RDFaJSON;
 
 (function(ns) {
-  var Context, bnode, itemOrRef, nextBNode, parseElement, storedKey;
+  var Context, Extraction;
   ns.extract = function(doc, base) {
-    var idMap, root, top;
+    var extract;
     doc || (doc = window.document);
     base || (base = typeof window !== "undefined" && window !== null ? window.location.href : void 0);
-    top = {};
-    if (base) {
-      top["@id"] = base;
-    }
-    root = {
-      '@context': {},
-      '@graph': [top]
-    };
-    idMap = {};
-    parseElement(doc.documentElement, root, top, null, {}, idMap);
-    return {
-      data: root,
-      map: idMap
-    };
+    extract = new Extraction(base);
+    extract.start(doc.documentElement);
+    return extract;
   };
-  parseElement = function(el, root, current, vocab, hanging, idMap) {
-    var attrs, child, ctxt, graph, i, inlist, item, items, key, l, next, pfx, pfxs, predicate, rev, sub, top, type, types, value, _i, _j, _k, _l, _len, _len1, _len2, _len3, _m, _ref, _ref1, _ref10, _ref11, _ref12, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
-    attrs = el.attributes;
-    graph = root['@graph'];
-    ctxt = new Context(root['@context'], current);
-    if (attrs != null) {
+  Extraction = (function() {
+
+    Extraction.name = 'Extraction';
+
+    function Extraction(base, profile) {
+      this.base = base;
+      this.profile = profile != null ? profile : 'html';
+      this.top = {};
+      if (this.base) {
+        this.top["@id"] = this.base;
+      }
+      this.data = {
+        '@context': {},
+        '@graph': [this.top]
+      };
+      this.idMap = {};
+      this.bnode_counter = 0;
+    }
+
+    Extraction.prototype.start = function(el) {
+      return this.parseElement(el, this.top, null, {});
+    };
+
+    Extraction.prototype.parseElement = function(el, current, vocab, hanging) {
+      var child, next, _i, _len, _ref, _ref1;
+      if (el.attributes != null) {
+        _ref = this.nextState(el, current, vocab, hanging), next = _ref[0], vocab = _ref[1], hanging = _ref[2];
+      }
+      _ref1 = el.childNodes;
+      for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
+        child = _ref1[_i];
+        if (child.nodeType === 1) {
+          this.parseElement(child, next || current, vocab, hanging);
+        }
+      }
+    };
+
+    Extraction.prototype.nextState = function(el, current, vocab, hanging) {
+      var attrs, ctxt, graph, i, inlist, item, items, key, l, next, pfx, pfxs, predicate, rev, sub, tagName, type, types, value, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref10, _ref11, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
+      attrs = el.attributes;
+      graph = this.data['@graph'];
+      ctxt = new Context(this.data['@context'], current);
+      tagName = el.nodeName.toLowerCase();
       if ((_ref = attrs.vocab) != null ? _ref.value : void 0) {
         vocab = attrs.vocab.value;
         ctxt.update('rdfa', "http://www.w3.org/ns/rdfa#");
-        top = graph[0];
-        top['rdfa:usesVocabulary'] = vocab;
+        this.top['rdfa:usesVocabulary'] = vocab;
       }
       if ((_ref1 = attrs.prefix) != null ? _ref1.value : void 0) {
         pfxs = attrs.prefix.value.split(/:?\s+/);
@@ -64,6 +89,11 @@ var RDFaJSON;
       }
       if (!next && attrs["typeof"]) {
         next = {};
+        if (this.profile === 'html') {
+          if (tagName === 'head' || tagName === 'body') {
+            next['@id'] = this.top['@id'];
+          }
+        }
       }
       predicate = ((_ref4 = attrs.property) != null ? _ref4.value : void 0) || ((_ref5 = attrs.rel) != null ? _ref5.value : void 0) || hanging.rel;
       if (predicate) {
@@ -103,7 +133,7 @@ var RDFaJSON;
           _ref7 = predicate.split(/\s+/);
           for (i = _k = 0, _len1 = _ref7.length; _k < _len1; i = ++_k) {
             key = _ref7[i];
-            key = storedKey(key, ctxt, vocab);
+            key = ctxt.storedKey(key, vocab);
             if (key) {
               if (current[key]) {
                 items = current[key];
@@ -128,7 +158,7 @@ var RDFaJSON;
                   '@list': items
                 } : items;
               }
-              item = itemOrRef(value, i, idMap);
+              item = this.itemOrRef(value, i);
               items.push(item);
             }
           }
@@ -138,8 +168,8 @@ var RDFaJSON;
           _ref9 = rev.split(/\s+/);
           for (i = _l = 0, _len2 = _ref9.length; _l < _len2; i = ++_l) {
             key = _ref9[i];
-            key = storedKey(key, ctxt, vocab);
-            item = itemOrRef(current, true, idMap);
+            key = ctxt.storedKey(key, vocab);
+            item = this.itemOrRef(current, true);
             items = value[key] || (value[key] = []);
             items.push(item);
             if (!predicate) {
@@ -170,16 +200,29 @@ var RDFaJSON;
           graph.push(next);
         }
       }
-    }
-    _ref12 = el.childNodes;
-    for (_m = 0, _len3 = _ref12.length; _m < _len3; _m++) {
-      child = _ref12[_m];
-      if (child.nodeType === 1) {
-        parseElement(child, root, next || current, vocab, hanging, idMap);
+      return [next, vocab, hanging];
+    };
+
+    Extraction.prototype.itemOrRef = function(value, asRef) {
+      var id;
+      if (asRef && typeof value === 'object' && !value['@value']) {
+        id = value['@id'] || (value['@id'] = nextBNode());
+        return {
+          '@id': id
+        };
+      } else {
+        return value;
       }
-    }
-  };
-  Context = (function() {
+    };
+
+    Extraction.prototype.nextBNode = function() {
+      return '_:GEN' + this.bnode_counter++;
+    };
+
+    return Extraction;
+
+  })();
+  return Context = (function() {
 
     Context.name = 'Context';
 
@@ -193,43 +236,28 @@ var RDFaJSON;
       var ctxt;
       ctxt = this.rootCtxt;
       if (this.rootCtxt[key] && this.rootCtxt[key] !== ref) {
-        ctxt = this.localCtxt;
-        this.current['@context'] = this.localCtxt;
+        ctxt = this.current['@context'] = this.localCtxt;
       }
       return ctxt[key] = ref;
+    };
+
+    Context.prototype.storedKey = function(key, vocab) {
+      var iri, splitPos;
+      splitPos = key != null ? key.indexOf(':') : void 0;
+      if (splitPos > -1) {
+
+      } else {
+        if (vocab) {
+          iri = vocab + key;
+          this.update(key, iri);
+        } else {
+          return null;
+        }
+      }
+      return key;
     };
 
     return Context;
 
   })();
-  storedKey = function(key, ctxt, vocab) {
-    var iri, splitPos;
-    splitPos = key != null ? key.indexOf(':') : void 0;
-    if (splitPos > -1) {
-
-    } else {
-      if (vocab) {
-        iri = vocab + key;
-        ctxt.update(key, iri);
-      } else {
-        return null;
-      }
-    }
-    return key;
-  };
-  itemOrRef = function(value, asRef, idMap) {
-    var id;
-    if (asRef && typeof value === 'object' && !value['@value']) {
-      id = value['@id'] || (value['@id'] = nextBNode());
-      return {
-        '@id': id
-      };
-    } else {
-      return value;
-    }
-  };
-  bnode = 0;
-  return nextBNode = function() {
-    return '_:GEN' + bnode++;
-  };
 })(typeof exports !== "undefined" && exports !== null ? exports : RDFaJSON = {});

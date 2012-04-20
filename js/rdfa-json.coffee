@@ -4,13 +4,10 @@
   ns.extract = (doc, base) ->
     doc or= window.document
     base or= window?.location.href
-    top = {}
-    if base
-      top["@id"] = base
-    root = {'@context': {}, '@graph': [top]}
-    idMap = {}
-    parseElement(doc.documentElement, root, top, null, {}, idMap)
-    return {data: root, map: idMap}
+    extract = new Extraction(base)
+    extract.start(doc.documentElement)
+    return extract
+
 
   # TODO:
   # - map first occurence of @id and fill in that
@@ -21,18 +18,38 @@
   # - if hanging and prop/rel/rev: inject bnode
   # - interplay of about, property, rel/rev, typeof
   # - xml:lang, xmlns:*
-  parseElement = (el, root, current, vocab, hanging, idMap) ->
-    attrs = el.attributes
-    graph = root['@graph']
-    ctxt = new Context(root['@context'], current)
+  class Extraction
 
-    if attrs?
+    constructor: (@base, @profile='html') ->
+      @top = {}
+      if @base
+        @top["@id"] = @base
+      @data = {'@context': {}, '@graph': [@top]}
+      @idMap = {}
+      @bnode_counter = 0
+
+    start: (el) ->
+      @parseElement(el, @top, null, {})
+
+    parseElement: (el, current, vocab, hanging) ->
+      if el.attributes?
+        [next, vocab, hanging] = @nextState(el, current, vocab, hanging)
+      for child in el.childNodes
+        if child.nodeType is 1
+          @parseElement(child, next or current, vocab, hanging)
+      return
+
+    nextState: (el, current, vocab, hanging) ->
+      attrs = el.attributes
+
+      graph = @data['@graph']
+      ctxt = new Context(@data['@context'], current)
+      tagName = el.nodeName.toLowerCase()
 
       if attrs.vocab?.value
         vocab = attrs.vocab.value
         ctxt.update('rdfa', "http://www.w3.org/ns/rdfa#")
-        top = graph[0]
-        top['rdfa:usesVocabulary'] = vocab
+        @top['rdfa:usesVocabulary'] = vocab
       if attrs.prefix?.value
         pfxs = attrs.prefix.value.split(/:?\s+/)
         for i in [0..pfxs.length] by 2
@@ -54,6 +71,9 @@
 
       if not next and attrs.typeof
         next = {}
+        if @profile == 'html'
+          if tagName == 'head' or tagName == 'body'
+            next['@id'] = @top['@id']
 
       predicate = attrs.property?.value or attrs.rel?.value or hanging.rel
 
@@ -86,7 +106,7 @@
       if value
         if predicate
           for key, i in predicate.split(/\s+/)
-            key = storedKey(key, ctxt, vocab)
+            key = ctxt.storedKey(key, vocab)
             if key
 
               if current[key]
@@ -106,15 +126,15 @@
                 items = []
                 current[key] = if inlist then {'@list': items} else items
 
-              item = itemOrRef(value, i, idMap)
+              item = @itemOrRef(value, i)
 
               items.push(item)
 
         rev = attrs.rev?.value or hanging.rev
         if rev
           for key, i in rev.split(/\s+/)
-            key = storedKey(key, ctxt, vocab)
-            item = itemOrRef(current, true, idMap)
+            key = ctxt.storedKey(key, vocab)
+            item = @itemOrRef(current, true)
             items = value[key] or= []
             items.push(item)
             unless predicate
@@ -134,43 +154,44 @@
         if (sub for sub in el.childNodes when sub.nodeType is 1).length
           graph.push(next)
 
-    for child in el.childNodes
-      if child.nodeType is 1
-        parseElement(child, root, next or current, vocab, hanging, idMap)
-    return
+      return [next, vocab, hanging]
+
+    itemOrRef: (value, asRef) ->
+      if asRef and typeof value == 'object' and not value['@value']
+        id = value['@id'] or= nextBNode()
+        return {'@id': id}
+      else
+        return value
+
+    nextBNode: () ->
+      return '_:GEN' + @bnode_counter++
+
 
   class Context
+
     constructor: (@rootCtxt, @current) ->
       @localCtxt = {}
+
     update: (key, ref) ->
-      # IMP: recover from local conflict
       ctxt = @rootCtxt
       if @rootCtxt[key] and @rootCtxt[key] != ref
-        ctxt = @localCtxt
-        @current['@context'] = @localCtxt
+        ctxt = @current['@context'] = @localCtxt
+        # IMP: recover from local conflict
+        #if ctxt[key] then ...
       ctxt[key] = ref
 
-  storedKey = (key, ctxt, vocab) ->
-    splitPos = key?.indexOf(':')
-    if splitPos > -1
-      # IMP: unless ns, find in profile
-    else
-      if vocab
-        iri = vocab + key
-        ctxt.update(key, iri)
+    storedKey: (key, vocab) ->
+      splitPos = key?.indexOf(':')
+      if splitPos > -1
+        # IMP: unless ns, find in profile
       else
-        # IMP: profile terms
-        return null
-    return key
+        if vocab
+          iri = vocab + key
+          @update(key, iri)
+        else
+          # IMP: profile terms
+          return null
+      return key
 
-  itemOrRef = (value, asRef, idMap) ->
-    if asRef and typeof value == 'object' and not value['@value']
-      id = value['@id'] or= nextBNode()
-      return {'@id': id}
-    else
-      return value
-
-  bnode = 0
-  nextBNode = () -> '_:GEN'+ bnode++
 
 )(exports ? RDFaJSON = {})
