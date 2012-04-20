@@ -3,36 +3,38 @@
 
   ns.extract = (doc, base) ->
     doc or= window.document
-    base or= window?.location.href
-    baseEl = doc.getElementsByTagName('base')[0]
-    if baseEl
-      base = baseEl.href
-    extract = new Extraction(base)
-    extract.start(doc.documentElement)
+    extract = new ns.Extraction(doc, base)
+    extract.run()
     return extract
 
 
   # TODO:
-  # - map first occurence of @id and fill in that
-  # - profile support (builtin html5 for now)
-  # IMP:
   # - about + prop: intermediate current
   # - fix hanging rev
-  # - if hanging and prop/rel/rev: inject bnode
   # - interplay of about, property, rel/rev, typeof
+  # - modularize and complete profile support (default context etc.)
+  # - map first occurence of @id and fill in that
+  # - resolve relative ref.split('..')
+  # - if hanging and prop/rel/rev: inject bnode
   # - xml:lang, xmlns:*
-  class Extraction
+  class ns.Extraction
 
-    constructor: (@base, @profile='html') ->
+    constructor: (@doc, @base=@doc.documentURI) ->
+      @profile = 'html'
+      if @profile == 'html'
+        baseEl = @doc.getElementsByTagName('base')[0]
+        if baseEl then @base = baseEl.href
       @top = {}
       if @base
         @top["@id"] = @base
       @data = {'@context': {}, '@graph': [@top]}
+      @resolver = @doc.createElement('a')
+      @bnodeCounter = 0
       @idMap = {}
-      @bnode_counter = 0
 
-    start: (el) ->
-      @parseElement(el, @top, null, {})
+    run: () ->
+      @parseElement(@doc.documentElement, @top, null, {})
+      return
 
     parseElement: (el, current, vocab, hanging) ->
       if el.attributes?
@@ -59,18 +61,17 @@
           pfx = pfxs[i]
           ns = pfxs[i+1]
           ctxt.update(pfx, ns)
-        # TODO: if we reach a non-xml literal here, add to just that?
+        # IMP: if we reach a non-xml literal here, add to just that?
         ctxt.update('@language', attrs.lang.value) if attrs.lang?.value
 
-      # IMP: resolve against base?
       if attrs.resource?
-        next = {'@id': attrs.resource.value}
+        next = {'@id': @resolve(attrs.resource.value)}
       else if attrs.href?
-        next = {'@id': attrs.href.value}
+        next = {'@id': el.href}
       else if attrs.src?
-        next = {'@id': attrs.src.value}
+        next = {'@id': @resolve(attrs.src.value)}
       else if attrs.about?
-        next = {'@id': attrs.about.value}
+        next = {'@id': @resolve(attrs.about.value)}
 
       if not next and attrs.typeof
         if @profile == 'html' and tagName == 'head' or tagName == 'body'
@@ -171,6 +172,10 @@
 
       return [next, vocab, hanging]
 
+    resolve: (ref) ->
+      @resolver.href = ref
+      return @resolver.href
+
     itemOrRef: (value, asRef) ->
       if asRef and typeof value == 'object' and not value['@value']
         id = value['@id'] or= nextBNode()
@@ -179,7 +184,7 @@
         return value
 
     nextBNode: () ->
-      return '_:GEN' + @bnode_counter++
+      return '_:GEN' + @bnodeCounter++
 
 
   class Context

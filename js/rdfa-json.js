@@ -2,26 +2,29 @@
 var RDFaJSON;
 
 (function(ns) {
-  var Context, Extraction;
+  var Context;
   ns.extract = function(doc, base) {
-    var baseEl, extract;
+    var extract;
     doc || (doc = window.document);
-    base || (base = typeof window !== "undefined" && window !== null ? window.location.href : void 0);
-    baseEl = doc.getElementsByTagName('base')[0];
-    if (baseEl) {
-      base = baseEl.href;
-    }
-    extract = new Extraction(base);
-    extract.start(doc.documentElement);
+    extract = new ns.Extraction(doc, base);
+    extract.run();
     return extract;
   };
-  Extraction = (function() {
+  ns.Extraction = (function() {
 
     Extraction.name = 'Extraction';
 
-    function Extraction(base, profile) {
-      this.base = base;
-      this.profile = profile != null ? profile : 'html';
+    function Extraction(doc, base) {
+      var baseEl;
+      this.doc = doc;
+      this.base = base != null ? base : this.doc.documentURI;
+      this.profile = 'html';
+      if (this.profile === 'html') {
+        baseEl = this.doc.getElementsByTagName('base')[0];
+        if (baseEl) {
+          this.base = baseEl.href;
+        }
+      }
       this.top = {};
       if (this.base) {
         this.top["@id"] = this.base;
@@ -30,12 +33,13 @@ var RDFaJSON;
         '@context': {},
         '@graph': [this.top]
       };
+      this.resolver = this.doc.createElement('a');
+      this.bnodeCounter = 0;
       this.idMap = {};
-      this.bnode_counter = 0;
     }
 
-    Extraction.prototype.start = function(el) {
-      return this.parseElement(el, this.top, null, {});
+    Extraction.prototype.run = function() {
+      this.parseElement(this.doc.documentElement, this.top, null, {});
     };
 
     Extraction.prototype.parseElement = function(el, current, vocab, hanging) {
@@ -76,19 +80,19 @@ var RDFaJSON;
       }
       if (attrs.resource != null) {
         next = {
-          '@id': attrs.resource.value
+          '@id': this.resolve(attrs.resource.value)
         };
       } else if (attrs.href != null) {
         next = {
-          '@id': attrs.href.value
+          '@id': el.href
         };
       } else if (attrs.src != null) {
         next = {
-          '@id': attrs.src.value
+          '@id': this.resolve(attrs.src.value)
         };
       } else if (attrs.about != null) {
         next = {
-          '@id': attrs.about.value
+          '@id': this.resolve(attrs.about.value)
         };
       }
       if (!next && attrs["typeof"]) {
@@ -220,6 +224,11 @@ var RDFaJSON;
       return [next, vocab, hanging];
     };
 
+    Extraction.prototype.resolve = function(ref) {
+      this.resolver.href = ref;
+      return this.resolver.href;
+    };
+
     Extraction.prototype.itemOrRef = function(value, asRef) {
       var id;
       if (asRef && typeof value === 'object' && !value['@value']) {
@@ -233,7 +242,7 @@ var RDFaJSON;
     };
 
     Extraction.prototype.nextBNode = function() {
-      return '_:GEN' + this.bnode_counter++;
+      return '_:GEN' + this.bnodeCounter++;
     };
 
     return Extraction;
