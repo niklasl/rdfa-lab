@@ -4,9 +4,13 @@ var RDFaJSON;
 (function(ns) {
   var Context, Extraction;
   ns.extract = function(doc, base) {
-    var extract;
+    var baseEl, extract;
     doc || (doc = window.document);
     base || (base = typeof window !== "undefined" && window !== null ? window.location.href : void 0);
+    baseEl = doc.getElementsByTagName('base')[0];
+    if (baseEl) {
+      base = baseEl.href;
+    }
     extract = new Extraction(base);
     extract.start(doc.documentElement);
     return extract;
@@ -49,7 +53,7 @@ var RDFaJSON;
     };
 
     Extraction.prototype.nextState = function(el, current, vocab, hanging) {
-      var attrs, ctxt, graph, i, inlist, item, items, key, l, next, pfx, pfxs, predicate, rev, sub, tagName, type, types, value, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref10, _ref11, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
+      var attrs, ctxt, datatype, graph, i, inlist, item, items, key, l, next, pfx, pfxs, predicate, rev, sub, tagName, type, types, value, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref10, _ref11, _ref12, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
       attrs = el.attributes;
       graph = this.data['@graph'];
       ctxt = new Context(this.data['@context'], current);
@@ -88,32 +92,45 @@ var RDFaJSON;
         };
       }
       if (!next && attrs["typeof"]) {
-        next = {};
-        if (this.profile === 'html') {
-          if (tagName === 'head' || tagName === 'body') {
-            next['@id'] = this.top['@id'];
-          }
+        if (this.profile === 'html' && tagName === 'head' || tagName === 'body') {
+          next = {
+            '@id': this.top['@id']
+          };
+        } else {
+          next = {};
         }
       }
       predicate = ((_ref4 = attrs.property) != null ? _ref4.value : void 0) || ((_ref5 = attrs.rel) != null ? _ref5.value : void 0) || hanging.rel;
       if (predicate) {
+        datatype = (_ref6 = attrs.datatype) != null ? _ref6.value : void 0;
         if (next) {
           value = next;
-        } else if (attrs.property && (attrs.content != null)) {
-          value = attrs.content.value;
-        } else if (!(attrs.rel || attrs.rev || hanging.rel || hanging.rev)) {
-          if (((_ref6 = attrs.datatype) != null ? _ref6.value : void 0) === 'rdf:XMLLiteral') {
+        } else if (attrs.property) {
+          if (attrs.content != null) {
+            value = attrs.content.value;
+          } else if (this.profile === 'html' && tagName === 'time') {
+            if (attrs.datetime != null) {
+              value = attrs.datetime.value;
+            } else {
+              value = el.textContent;
+            }
+            ctxt.update('xsd', "http://www.w3.org/2001/XMLSchema#");
+            datatype = value.indexOf('T') > -1 ? 'xsd:dateTime' : 'xsd:date';
+          }
+        }
+        if (!value && !(attrs.rel || attrs.rev || hanging.rel || hanging.rev)) {
+          if (((_ref7 = attrs.datatype) != null ? _ref7.value : void 0) === 'rdf:XMLLiteral') {
             value = el.innerHTML;
           } else {
             value = el.textContent;
           }
         }
-        if (attrs.datatype) {
+        if (datatype != null) {
           value = {
             '@value': value
           };
-          if (attrs.datatype.value) {
-            value['@type'] = attrs.datatype.value;
+          if (datatype) {
+            value['@type'] = datatype;
           }
         }
       }
@@ -130,9 +147,9 @@ var RDFaJSON;
       inlist = (attrs.inlist !== void 0) || (hanging.rel && hanging.inlist);
       if (value) {
         if (predicate) {
-          _ref7 = predicate.split(/\s+/);
-          for (i = _k = 0, _len1 = _ref7.length; _k < _len1; i = ++_k) {
-            key = _ref7[i];
+          _ref8 = predicate.split(/\s+/);
+          for (i = _k = 0, _len1 = _ref8.length; _k < _len1; i = ++_k) {
+            key = _ref8[i];
             key = ctxt.storedKey(key, vocab);
             if (key) {
               if (current[key]) {
@@ -163,11 +180,11 @@ var RDFaJSON;
             }
           }
         }
-        rev = ((_ref8 = attrs.rev) != null ? _ref8.value : void 0) || hanging.rev;
+        rev = ((_ref9 = attrs.rev) != null ? _ref9.value : void 0) || hanging.rev;
         if (rev) {
-          _ref9 = rev.split(/\s+/);
-          for (i = _l = 0, _len2 = _ref9.length; _l < _len2; i = ++_l) {
-            key = _ref9[i];
+          _ref10 = rev.split(/\s+/);
+          for (i = _l = 0, _len2 = _ref10.length; _l < _len2; i = ++_l) {
+            key = _ref10[i];
             key = ctxt.storedKey(key, vocab);
             item = this.itemOrRef(current, true);
             items = value[key] || (value[key] = []);
@@ -180,17 +197,17 @@ var RDFaJSON;
         hanging = {};
       } else if (attrs.rel || attrs.rev) {
         hanging = {
-          rel: (_ref10 = attrs.rel) != null ? _ref10.value : void 0,
-          rev: (_ref11 = attrs.rev) != null ? _ref11.value : void 0,
+          rel: (_ref11 = attrs.rel) != null ? _ref11.value : void 0,
+          rev: (_ref12 = attrs.rev) != null ? _ref12.value : void 0,
           inlist: attrs.inlist !== void 0
         };
       } else if (next) {
         if (((function() {
-          var _len3, _m, _ref12, _results;
-          _ref12 = el.childNodes;
+          var _len3, _m, _ref13, _results;
+          _ref13 = el.childNodes;
           _results = [];
-          for (_m = 0, _len3 = _ref12.length; _m < _len3; _m++) {
-            sub = _ref12[_m];
+          for (_m = 0, _len3 = _ref13.length; _m < _len3; _m++) {
+            sub = _ref13[_m];
             if (sub.nodeType === 1) {
               _results.push(sub);
             }

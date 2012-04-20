@@ -4,6 +4,9 @@
   ns.extract = (doc, base) ->
     doc or= window.document
     base or= window?.location.href
+    baseEl = doc.getElementsByTagName('base')[0]
+    if baseEl
+      base = baseEl.href
     extract = new Extraction(base)
     extract.start(doc.documentElement)
     return extract
@@ -70,29 +73,41 @@
         next = {'@id': attrs.about.value}
 
       if not next and attrs.typeof
-        next = {}
-        if @profile == 'html'
-          if tagName == 'head' or tagName == 'body'
-            next['@id'] = @top['@id']
+        if @profile == 'html' and tagName == 'head' or tagName == 'body'
+          next = {'@id': @top['@id']}
+        else
+          next = {}
 
       predicate = attrs.property?.value or attrs.rel?.value or hanging.rel
 
       if predicate
+        datatype = attrs.datatype?.value
         if next
           value = next
-        else if attrs.property and attrs.content?
-          value = attrs.content.value
-        else unless attrs.rel or attrs.rev or hanging.rel or hanging.rev
+        else if attrs.property
+          if attrs.content?
+            value = attrs.content.value
+          else if @profile == 'html' and tagName == 'time'
+            if attrs.datetime?
+              value = attrs.datetime.value
+            else
+              value = el.textContent
+            ctxt.update('xsd', "http://www.w3.org/2001/XMLSchema#")
+            datatype = if value.indexOf('T') > -1
+              'xsd:dateTime'
+            else
+              'xsd:date'
+        if not value and not (attrs.rel or attrs.rev or hanging.rel or hanging.rev)
           # TODO: resolve datatype and match IRI
           if attrs.datatype?.value == 'rdf:XMLLiteral'
             value = el.innerHTML
           else
             value = el.textContent
 
-        if attrs.datatype
+        if datatype?
           value = {'@value': value}
-          if attrs.datatype.value
-            value['@type'] = attrs.datatype.value
+          if datatype
+            value['@type'] = datatype
 
       if attrs.typeof
         types = attrs.typeof.value.split(/\s+/)
