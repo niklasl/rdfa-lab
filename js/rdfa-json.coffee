@@ -54,7 +54,7 @@
         ctxt.update('rdfa', "http://www.w3.org/ns/rdfa#")
         @top['rdfa:usesVocabulary'] = vocab
       if attrs.prefix?.value
-        pfxs = attrs.prefix.value.split(/:?\s+/)
+        pfxs = attrs.prefix.value.replace(/^\s+|\s+$/g, "").split(/:?\s+/)
         for i in [0..pfxs.length] by 2
           pfx = pfxs[i]
           ns = pfxs[i+1]

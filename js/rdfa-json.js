@@ -64,7 +64,7 @@ var RDFaJSON;
         this.top['rdfa:usesVocabulary'] = vocab;
       }
       if ((_ref1 = attrs.prefix) != null ? _ref1.value : void 0) {
-        pfxs = attrs.prefix.value.split(/:?\s+/);
+        pfxs = attrs.prefix.value.replace(/^\s+|\s+$/g, "").split(/:?\s+/);
         for (i = _i = 0, _ref2 = pfxs.length; _i <= _ref2; i = _i += 2) {
           pfx = pfxs[i];
           ns = pfxs[i + 1];
