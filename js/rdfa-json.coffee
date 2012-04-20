@@ -3,7 +3,7 @@
 
   ns.extract = (doc, base) ->
     doc or= window.document
-    extract = new ns.Extraction(doc, base)
+    extract = new ns.Extract(doc, base)
     extract.run()
     return extract
 
@@ -17,7 +17,7 @@
   # - resolve relative ref.split('..')
   # - if hanging and prop/rel/rev: inject bnode
   # - xml:lang, xmlns:*
-  class ns.Extraction
+  class ns.Extract
 
     constructor: (@doc, @base=@doc.documentURI) ->
       @profile = 'html'
@@ -31,6 +31,9 @@
       @resolver = @doc.createElement('a')
       @bnodeCounter = 0
       @idMap = {}
+
+    toJSON: () ->
+      return @data
 
     run: () ->
       @parseElement(@doc.documentElement, @top, null, {})

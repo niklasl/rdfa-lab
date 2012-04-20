@@ -6,15 +6,15 @@ var RDFaJSON;
   ns.extract = function(doc, base) {
     var extract;
     doc || (doc = window.document);
-    extract = new ns.Extraction(doc, base);
+    extract = new ns.Extract(doc, base);
     extract.run();
     return extract;
   };
-  ns.Extraction = (function() {
+  ns.Extract = (function() {
 
-    Extraction.name = 'Extraction';
+    Extract.name = 'Extract';
 
-    function Extraction(doc, base) {
+    function Extract(doc, base) {
       var baseEl;
       this.doc = doc;
       this.base = base != null ? base : this.doc.documentURI;
@@ -38,11 +38,15 @@ var RDFaJSON;
       this.idMap = {};
     }
 
-    Extraction.prototype.run = function() {
+    Extract.prototype.toJSON = function() {
+      return this.data;
+    };
+
+    Extract.prototype.run = function() {
       this.parseElement(this.doc.documentElement, this.top, null, {});
     };
 
-    Extraction.prototype.parseElement = function(el, current, vocab, hanging) {
+    Extract.prototype.parseElement = function(el, current, vocab, hanging) {
       var child, next, _i, _len, _ref, _ref1;
       if (el.attributes != null) {
         _ref = this.nextState(el, current, vocab, hanging), next = _ref[0], vocab = _ref[1], hanging = _ref[2];
@@ -56,7 +60,7 @@ var RDFaJSON;
       }
     };
 
-    Extraction.prototype.nextState = function(el, current, vocab, hanging) {
+    Extract.prototype.nextState = function(el, current, vocab, hanging) {
       var attrs, ctxt, datatype, graph, i, inlist, item, items, key, l, next, pfx, pfxs, predicate, rev, sub, tagName, type, types, value, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref10, _ref11, _ref12, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
       attrs = el.attributes;
       graph = this.data['@graph'];
@@ -224,12 +228,12 @@ var RDFaJSON;
       return [next, vocab, hanging];
     };
 
-    Extraction.prototype.resolve = function(ref) {
+    Extract.prototype.resolve = function(ref) {
       this.resolver.href = ref;
       return this.resolver.href;
     };
 
-    Extraction.prototype.itemOrRef = function(value, asRef) {
+    Extract.prototype.itemOrRef = function(value, asRef) {
       var id;
       if (asRef && typeof value === 'object' && !value['@value']) {
         id = value['@id'] || (value['@id'] = nextBNode());
@@ -241,11 +245,11 @@ var RDFaJSON;
       }
     };
 
-    Extraction.prototype.nextBNode = function() {
+    Extract.prototype.nextBNode = function() {
       return '_:GEN' + this.bnodeCounter++;
     };
 
-    return Extraction;
+    return Extract;
 
   })();
   return Context = (function() {
