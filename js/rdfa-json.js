@@ -29,9 +29,10 @@ var RDFaJSON;
       if (this.base) {
         this.top["@id"] = this.base;
       }
+      this.graph = [this.top];
       this.data = {
         '@context': {},
-        '@graph': [this.top]
+        '@graph': this.graph
       };
       this.resolver = this.doc.createElement('a');
       this.bnodeCounter = 0;
@@ -55,15 +56,14 @@ var RDFaJSON;
       for (_i = 0, _len = _ref1.length; _i < _len; _i++) {
         child = _ref1[_i];
         if (child.nodeType === 1) {
-          this.parseElement(child, next || current, vocab, hanging);
+          this.parseElement(child, next, vocab, hanging);
         }
       }
     };
 
     Extract.prototype.nextState = function(el, current, vocab, hanging) {
-      var attrs, ctxt, datatype, graph, i, inlist, item, items, key, l, next, pfx, pfxs, predicate, rev, sub, tagName, type, types, value, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref10, _ref11, _ref12, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
+      var attrs, ctxt, datatype, i, inlist, item, items, key, l, next, pfx, pfxs, predicate, rev, sub, tagName, type, types, value, _i, _j, _k, _l, _len, _len1, _len2, _ref, _ref1, _ref10, _ref11, _ref12, _ref2, _ref3, _ref4, _ref5, _ref6, _ref7, _ref8, _ref9;
       attrs = el.attributes;
-      graph = this.data['@graph'];
       ctxt = new Context(this.data['@context'], current);
       tagName = el.nodeName.toLowerCase();
       if ((_ref = attrs.vocab) != null ? _ref.value : void 0) {
@@ -198,7 +198,7 @@ var RDFaJSON;
             items = value[key] || (value[key] = []);
             items.push(item);
             if (!predicate) {
-              graph.push(value);
+              this.graph.push(value);
             }
           }
         }
@@ -222,10 +222,10 @@ var RDFaJSON;
           }
           return _results;
         })()).length) {
-          graph.push(next);
+          this.graph.push(next);
         }
       }
-      return [next, vocab, hanging];
+      return [next || current, vocab, hanging];
     };
 
     Extract.prototype.resolve = function(ref) {

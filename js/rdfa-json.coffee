@@ -9,12 +9,11 @@
 
 
   # TODO:
-  # - about + prop: intermediate current
+  # - fix interplay of about, property, rel/rev, typeof
   # - fix hanging rev
-  # - interplay of about, property, rel/rev, typeof
   # - modularize and complete profile support (default context etc.)
+  # then:
   # - map first occurence of @id and fill in that
-  # - resolve relative ref.split('..')
   # - if hanging and prop/rel/rev: inject bnode
   # - xml:lang, xmlns:*
   class ns.Extract
@@ -27,7 +26,8 @@
       @top = {}
       if @base
         @top["@id"] = @base
-      @data = {'@context': {}, '@graph': [@top]}
+      @graph = [@top]
+      @data = {'@context': {}, '@graph': @graph}
       @resolver = @doc.createElement('a')
       @bnodeCounter = 0
       @idMap = {}
@@ -44,13 +44,12 @@
         [next, vocab, hanging] = @nextState(el, current, vocab, hanging)
       for child in el.childNodes
         if child.nodeType is 1
-          @parseElement(child, next or current, vocab, hanging)
+          @parseElement(child, next, vocab, hanging)
       return
 
     nextState: (el, current, vocab, hanging) ->
       attrs = el.attributes
 
-      graph = @data['@graph']
       ctxt = new Context(@data['@context'], current)
       tagName = el.nodeName.toLowerCase()
 
@@ -157,7 +156,7 @@
             items = value[key] or= []
             items.push(item)
             unless predicate
-              graph.push(value)
+              @graph.push(value)
 
         hanging = {}
 
@@ -171,9 +170,9 @@
       else if next
         # IMP: defer attach until a predicate for this is used?
         if (sub for sub in el.childNodes when sub.nodeType is 1).length
-          graph.push(next)
+          @graph.push(next)
 
-      return [next, vocab, hanging]
+      return [next or current, vocab, hanging]
 
     resolve: (ref) ->
       @resolver.href = ref
