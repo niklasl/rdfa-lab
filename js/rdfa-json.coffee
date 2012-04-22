@@ -13,9 +13,10 @@
   # - fix hanging rev
   # - modularize and complete profile support (default context etc.)
   # then:
-  # - map first occurence of @id and fill in that
   # - if hanging and prop/rel/rev: inject bnode
   # - xml:lang, xmlns:*
+  # maybe:
+  # - map first occurrence of an @id and fill in that?
   class ns.Extract
 
     constructor: (@doc, @base=@doc.documentURI) ->
@@ -30,7 +31,7 @@
       @data = {'@context': {}, '@graph': @graph}
       @resolver = @doc.createElement('a')
       @bnodeCounter = 0
-      @idMap = {}
+      #@idMap = {}
 
     toJSON: () ->
       return @data
@@ -172,7 +173,10 @@
         if (sub for sub in el.childNodes when sub.nodeType is 1).length
           @graph.push(next)
 
-      return [next or current, vocab, hanging]
+      if not next #or next['@id'] == current['@id'] # don't detach as new?
+        next = current
+
+      return [next, vocab, hanging]
 
     resolve: (ref) ->
       @resolver.href = ref

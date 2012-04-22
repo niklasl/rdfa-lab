@@ -36,7 +36,6 @@ var RDFaJSON;
       };
       this.resolver = this.doc.createElement('a');
       this.bnodeCounter = 0;
-      this.idMap = {};
     }
 
     Extract.prototype.toJSON = function() {
@@ -225,7 +224,10 @@ var RDFaJSON;
           this.graph.push(next);
         }
       }
-      return [next || current, vocab, hanging];
+      if (!next) {
+        next = current;
+      }
+      return [next, vocab, hanging];
     };
 
     Extract.prototype.resolve = function(ref) {
