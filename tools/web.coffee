@@ -10,7 +10,7 @@ http.createServer((req, res) ->
     jsdom.env url, [], #["../js/rdfa-json.js"],
       (errors, window) ->
         console.log('loaded ' + window)
-        res.writeHead(200, {'Content-Type': 'application/json'})
+        res.writeHead(200, {'Content-Type': 'application/ld+json'})
         data = RDFaJSON.extract(window.document)
         res.end(JSON.stringify(data, null, 2))
   else
