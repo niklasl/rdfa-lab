@@ -1,0 +1,136 @@
+
+/* TODO:
+- add reset+html5 css prelude
+*/
+
+body {
+  background-color: #fff;
+  color: #aaa;
+  font-family: sans-serif;
+  font-size: 75%;
+  margin: auto;
+  width: 80%;
+  max-width: 64em;
+}
+
+a {
+  color: #aaa;
+  text-decoration: none;
+}
+
+img, canvas {
+   opacity: 0.3;
+}
+
+link, meta {
+    outline-style: dotted !important;
+}
+
+[vocab]:before {
+    color: orange;
+    content: "@vocab <" attr(vocab) ">";
+    font-size: 0.75em;
+}
+[prefix]:before {
+    color: orange;
+    content: "@prefix " attr(prefix);
+    font-size: 0.75em;
+    white-space: pre;
+}
+
+[typeof]:before {
+    background-color: #fff;
+    color: purple;
+    content: attr(typeof);
+    font-size: 0.8em;
+    font-weight: bold;
+    padding: 0 2px;
+    position: relative; top: -1.5em;
+}
+[typeof] {
+    box-shadow: rgba(63, 0, 63, 1) 0em 0.1em 0.3em;
+    display: inline-block;
+    outline: 1px solid #ede;
+    padding: 0.5em;
+    margin: 1em 0;
+}
+
+[about]:before {
+    color: purple;
+    content: "<" attr(about) ">";
+}
+[about][typeof]:before {
+    content: "<" attr(about) "> a " attr(typeof);
+}
+
+[property]:not([href]):not([resource]):before {
+    background-color: #ffe;
+    color: #885;
+    content: attr(property);
+    font-size: 0.75em;
+    font-weight: bold;
+    padding: 0 2px;
+    position: relative; top: -1em; left: 0em;
+}
+[property]:not([href]):not([resource])[content]:before {
+    content: attr(property) " \"" attr(content) "\"";
+}
+
+[property] {
+    display: inline-block;
+    margin-top: 0.7em;
+    outline: 1px solid #ffa;
+    background-color: #ffe;
+}
+[property], [property] * {
+    color: #333;
+}
+
+/* TODO:
+- for resource alone, see about
+- for resource or href with typeof, see about with typeof
+- add more cases, e.g. [rel][typeof][resource]
+- .. or just change all resource/href :after to joint :before
+*/
+[property][href]:before,
+[property][resource]:before,
+[rel]:before {
+    background-color: #eff;
+    color: #067;
+    font-size: 0.75em;
+    font-weight: bold;
+    padding: 0 2px;
+    position: relative; top: -1em; left: 0em;
+}
+[property][resource]:before,
+[property][href]:before {
+    content: attr(property);
+}
+[rel]:before {
+    content: attr(rel);
+}
+[property][href],
+[rel] {
+    background-color: #eff;
+    display: inline-block;
+    margin-top: 0.7em;
+    outline: 1px solid #6da;
+}
+[property][resource]:after, [property][href]:after,
+[rel][resource]:after, [rel][href]:after,
+[rel] [resource]:after, [rel] [href]:after {
+    color: #067;
+    font-size: 0.75em;
+    font-weight: bold;
+}
+[property][resource]:after,
+[rel][resource]:after,
+[rel] [resource]:after {
+    content: "<" attr(resource) ">";
+}
+[property][href]:after,
+[rel][href]:after,
+[rel] [href]:after {
+    content: "<" attr(href) ">";
+}
+
