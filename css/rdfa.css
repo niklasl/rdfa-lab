@@ -23,7 +23,7 @@ body {
   max-width: 64em;
 }
 
-a {
+a, link {
   color: #bbb;
   text-decoration: none;
 }
@@ -56,19 +56,19 @@ link, meta {
 
 [property]:not([href]):not([resource]):not([typeof]):before {
     background-color: #ffe;
-    color: #e30;
+    color: #c30;
     content: attr(property);
     font-size: 10px;
     font-weight: bold;
     padding: 0 2px;
-    position: relative; top: -1em;
+    vertical-align: super;
 }
 [property]:not([href]):not([resource]):not([typeof])[content]:before {
     content: attr(property) " \"" attr(content) "\"";
 }
-meta[property]:not([href]):not([resource]):not([typeof])[content]:before {
+meta[property]:before {
     content: attr(property) " \"" attr(content) "\"";
-    position: static;
+    vertical-align: baseline !important;
 }
 meta[property],
 [property]:not([href]):not([resource]):not([typeof]):not([content]) {
@@ -89,10 +89,11 @@ meta[property] {
     background-color: #fff;
     color: purple;
     content: "a " attr(typeof);
+    display: block;
     font-size: 11px;
     font-weight: bold;
     padding: 0 2px;
-    position: relative; top: -1.5em;
+    vertical-align: super;
 }
 [about],
 [typeof] {
@@ -100,8 +101,6 @@ meta[property] {
     display: inline-block;
     outline: 1px solid #ede;
     padding: 0.5em;
-    margin-top: 1em;
-    margin-bottom: 1em;
 }
 
 [about]:before {
@@ -159,10 +158,10 @@ meta[property] {
     font-size: 11px;
     font-weight: bold;
     padding: 0 2px;
-    position: relative; top: -1em;
+    vertical-align: super;
 }
 link:before {
-    position: static !important;
+    vertical-align: baseline !important;
 }
 [property][href]:before {
     content: attr(property) " <" attr(href) ">";
