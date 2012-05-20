@@ -1,6 +1,8 @@
 
 /* TODO:
-- add full reset+html5 css prelude?
+- Add support for [src]
+- Add support for date [datetime]
+- Add full reset+html5 css prelude?
 */
 
 head {
@@ -86,7 +88,6 @@ meta[property] {
 }
 
 [typeof]:before {
-    background-color: #fff;
     color: purple;
     content: "a " attr(typeof);
     display: block;
