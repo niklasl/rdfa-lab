@@ -1,6 +1,6 @@
 
 /* TODO:
-- add reset+html5 css prelude
+- add full reset+html5 css prelude?
 */
 
 head {
@@ -36,9 +36,15 @@ link, meta {
     outline-style: dotted !important;
 }
 
-[vocab]:before {
+/* TODO: before(2) hardly supported; extend all(!) combos with vocab? E.g.:
+[resource][typeof][vocab]:before {
+    content: "<" attr(resource) "> a " attr(typeof) " @vocab <" attr(vocab) ">";
+}
+*/
+[vocab]:before,
+[vocab]:before(2) {
     color: orange;
-    content: "@vocab <" attr(vocab) ">";
+    content: "@vocab <" attr(vocab) ">\a";
     font-size: 10px;
 }
 [prefix]:before {
@@ -50,7 +56,7 @@ link, meta {
 
 [property]:not([href]):not([resource]):not([typeof]):before {
     background-color: #ffe;
-    color: #885;
+    color: #e30;
     content: attr(property);
     font-size: 10px;
     font-weight: bold;
@@ -144,11 +150,6 @@ meta[property] {
     color: purple;
     content: "<" attr(resource) "> a " attr(typeof);
 }
-/* TODO: add vocab to all combos?
-[resource][typeof][vocab]:before {
-    content: "<" attr(resource) "> a " attr(typeof) " @vocab <" attr(vocab) ">";
-}
-*/
 
 [rel]:before,
 [property][href]:before,
