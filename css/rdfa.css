@@ -3,18 +3,28 @@
 - add reset+html5 css prelude
 */
 
+head {
+    background-color: #eee;
+    border-bottom: 1px inset #aaa;
+    display: block;
+    padding-bottom: 0.5em;
+}
+head > style, head > script {
+    display: none;
+}
+
 body {
   background-color: #fff;
-  color: #aaa;
+  color: #bbb;
   font-family: sans-serif;
-  font-size: 75%;
+  font-size: 80%;
   margin: auto;
   width: 80%;
   max-width: 64em;
 }
 
 a {
-  color: #aaa;
+  color: #bbb;
   text-decoration: none;
 }
 
@@ -29,30 +39,63 @@ link, meta {
 [vocab]:before {
     color: orange;
     content: "@vocab <" attr(vocab) ">";
-    font-size: 0.75em;
+    font-size: 10px;
 }
 [prefix]:before {
     color: orange;
     content: "@prefix " attr(prefix);
-    font-size: 0.75em;
+    font-size: 10px;
     white-space: pre;
+}
+
+[property]:not([href]):not([resource]):not([typeof]):before {
+    background-color: #ffe;
+    color: #885;
+    content: attr(property);
+    font-size: 10px;
+    font-weight: bold;
+    padding: 0 2px;
+    position: relative; top: -1em;
+}
+[property]:not([href]):not([resource]):not([typeof])[content]:before {
+    content: attr(property) " \"" attr(content) "\"";
+}
+meta[property]:not([href]):not([resource]):not([typeof])[content]:before {
+    content: attr(property) " \"" attr(content) "\"";
+    position: static;
+}
+meta[property],
+[property]:not([href]):not([resource]):not([typeof]):not([content]) {
+    display: inline-block;
+    margin-top: 0.7em;
+    outline: 1px solid #ffa;
+    background-color: #ffe;
+}
+meta[property] {
+    margin: 0;
+}
+[property]:not([href]):not([resource]):not([typeof]):not([content]),
+[property]:not([href]):not([resource]):not([typeof]):not([content]) * {
+    color: #a43;
 }
 
 [typeof]:before {
     background-color: #fff;
     color: purple;
-    content: attr(typeof);
-    font-size: 0.8em;
+    content: "a " attr(typeof);
+    font-size: 11px;
     font-weight: bold;
     padding: 0 2px;
     position: relative; top: -1.5em;
 }
+[about],
 [typeof] {
     box-shadow: rgba(63, 0, 63, 1) 0em 0.1em 0.3em;
     display: inline-block;
     outline: 1px solid #ede;
     padding: 0.5em;
-    margin: 1em 0;
+    margin-top: 1em;
+    margin-bottom: 1em;
 }
 
 [about]:before {
@@ -63,74 +106,92 @@ link, meta {
     content: "<" attr(about) "> a " attr(typeof);
 }
 
-[property]:not([href]):not([resource]):before {
-    background-color: #ffe;
-    color: #885;
-    content: attr(property);
-    font-size: 0.75em;
-    font-weight: bold;
-    padding: 0 2px;
-    position: relative; top: -1em; left: 0em;
-}
-[property]:not([href]):not([resource])[content]:before {
-    content: attr(property) " \"" attr(content) "\"";
-}
+/* TODO: order and test all combos of [property][rel][typeof][resource][href] */
 
-[property] {
-    display: inline-block;
-    margin-top: 0.7em;
-    outline: 1px solid #ffa;
-    background-color: #ffe;
-}
-[property], [property] * {
-    color: #333;
-}
-
-/* TODO:
-- for resource alone, see about
-- for resource or href with typeof, see about with typeof
-- add more cases, e.g. [rel][typeof][resource]
-- .. or just change all resource/href :after to joint :before
-*/
-[property][href]:before,
-[property][resource]:before,
-[rel]:before {
-    background-color: #eff;
-    color: #067;
-    font-size: 0.75em;
-    font-weight: bold;
-    padding: 0 2px;
-    position: relative; top: -1em; left: 0em;
-}
-[property][resource]:before,
-[property][href]:before {
-    content: attr(property);
-}
-[rel]:before {
-    content: attr(rel);
-}
+[property][resource],
 [property][href],
+[rel] {
+    outline: 1px solid #6da;
+}
+
+[property][typeof],
+[property][typeof][resource],
+[property][typeof][href],
 [rel] {
     background-color: #eff;
     display: inline-block;
     margin-top: 0.7em;
-    outline: 1px solid #6da;
 }
-[property][resource]:after, [property][href]:after,
-[rel][resource]:after, [rel][href]:after,
-[rel] [resource]:after, [rel] [href]:after {
+[href]:before,
+[href][typeof]:before,
+[resource]:before,
+[resource][typeof]:before {
     color: #067;
-    font-size: 0.75em;
+    font-size: 11px;
     font-weight: bold;
 }
-[property][resource]:after,
-[rel][resource]:after,
-[rel] [resource]:after {
+[href]:before {
+    content: "<" attr(href) ">";
+}
+[href][typeof]:before {
+    color: purple;
+    content: "<" attr(href) "> a " attr(typeof);
+}
+[resource]:before {
     content: "<" attr(resource) ">";
 }
-[property][href]:after,
-[rel][href]:after,
-[rel] [href]:after {
-    content: "<" attr(href) ">";
+[resource][typeof]:before {
+    color: purple;
+    content: "<" attr(resource) "> a " attr(typeof);
+}
+/* TODO: add vocab to all combos?
+[resource][typeof][vocab]:before {
+    content: "<" attr(resource) "> a " attr(typeof) " @vocab <" attr(vocab) ">";
+}
+*/
+
+[rel]:before,
+[property][href]:before,
+[property][resource]:before {
+    background-color: #eff;
+    color: #067;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 0 2px;
+    position: relative; top: -1em;
+}
+link:before {
+    position: static !important;
+}
+[property][href]:before {
+    content: attr(property) " <" attr(href) ">";
+}
+[property][resource]:before {
+    content: attr(property) " <" attr(resource) ">";
+}
+[property][typeof]:before {
+    content: attr(property) " [] a " attr(typeof);
+}
+[property][href][typeof]:before {
+    content: attr(property) " <" attr(href) "> a " attr(typeof);
+}
+[property][resource][typeof]:before {
+    content: attr(property) " <" attr(resource) "> a " attr(typeof);
+}
+
+[rel]:before {
+    content: attr(rel);
+}
+[rel][href]:before {
+    content: attr(rel) " <" attr(href) ">";
+}
+[rel][resource]:before {
+    content: attr(rel) " <" attr(resource) ">";
+}
+[rel][href][typeof]:before {
+    content: attr(rel) " <" attr(href) "> a " attr(typeof);
+}
+[rel][resource][typeof]:before {
+    content: attr(rel) " <" attr(resource) "> a " attr(typeof);
 }
 
