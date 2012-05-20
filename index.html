@@ -10,8 +10,11 @@
       <p>Save these links as bookmarks:</p>
       <ul>
         <li>
-          <a href='javascript: void((function () { if(!document.getElementById("rdfa-json-boot")){ var s=document.createElement("script"); s.type="text/javascript"; s.id="rdfa-json-boot"; s.src="http://niklasl.github.com/rdfa-lab/js/rdfa-json.js"; s.onload = function () { var json = JSON.stringify(RDFaJSON.extract().data, null, 2).replace(/{\s+(\S+: "[^"]+")\s+}/gm, "{$1}").replace(/\[\s+(.+)\s+\]/gm, "[$1]"); window.location = "data:application/json," + encodeURIComponent(json); }; document.getElementsByTagName("head")[0].appendChild(s); } })());'
+          <a id="bmlet-rdfa-to-jsonld" href='javascript: void((function () { if(!document.getElementById("rdfa-json-boot")){ var s=document.createElement("script"); s.type="text/javascript"; s.id="rdfa-json-boot"; s.src="http://niklasl.github.com/rdfa-lab/js/rdfa-json.js"; s.onload = function () { var json = JSON.stringify(RDFaJSON.extract().data, null, 2).replace(/{\s+(\S+: "[^"]+")\s+}/gm, "{$1}").replace(/\[\s+(.+)\s+\]/gm, "[$1]"); window.location = "data:application/json," + encodeURIComponent(json); }; document.getElementsByTagName("head")[0].appendChild(s); } })());'
             >RDFa to JSON-LD</a>
+        </li>
+        <li>
+          <a id="bmlet-use-rdfa-css" href='javascript: void((function () {var d=document, links=d.getElementsByTagName("link"); for(var i=0, l; l=links[i++];) { if(l.rel.indexOf("stylesheet") != -1) l.disabled = true; } if (d.getElementById("rdfa-css")) return; var l = d.createElement("link"); l.rel = "stylesheet"; l.id = "rdfa-css"; l.href = "http://niklasl.github.com/rdfa-lab/css/rdfa.css"; d.getElementsByTagName("head")[0].appendChild(l); })());'>Use RDFa.CSS</a>
         </li>
       </ul>
     </section>
