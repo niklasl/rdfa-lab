@@ -2,6 +2,8 @@
 /* TODO:
 - Add support for [src]
 - Add support for date [datetime]
+- Add support for [datatype]
+- Add support for [lang]
 - Add full reset+html5 css prelude?
 */
 
@@ -35,7 +37,7 @@ img, canvas {
 }
 
 link, meta {
-    outline-style: dotted !important;
+    border-style: dotted !important;
 }
 
 /* TODO: before(2) hardly supported; extend all(!) combos with vocab? E.g.:
@@ -76,7 +78,7 @@ meta[property],
 [property]:not([href]):not([resource]):not([typeof]):not([content]) {
     display: inline-block;
     margin-top: 0.7em;
-    outline: 1px solid #ffa;
+    border: 1px solid #ffa;
     background-color: #ffe;
 }
 meta[property] {
@@ -87,21 +89,36 @@ meta[property] {
     color: #a43;
 }
 
-[typeof]:before {
+[about]:before,
+[typeof]:before,
+[href]:not([property]):not([rel]):before,
+[resource]:not([property]):not([rel]):before {
     color: purple;
-    content: "a " attr(typeof);
-    display: block;
+    display: inline-block;
     font-size: 11px;
     font-weight: bold;
     padding: 0 2px;
     vertical-align: super;
 }
+[about]:before,
+[typeof]:before {
+    display: block !important;
+}
 [about],
-[typeof] {
+[typeof],
+[href]:not([property]):not([rel]),
+[resource]:not([property]):not([rel]) {
     box-shadow: rgba(63, 0, 63, 1) 0em 0.1em 0.3em;
     display: inline-block;
-    outline: 1px solid #ede;
+    border: 1px solid #ede;
     padding: 0.5em;
+}
+[href]:not([property]):not([rel]):not([typeof]) {
+    box-shadow: rgba(63, 0, 63, 0.4) 0em 0.1em 0.3em;
+}
+
+[typeof]:before {
+    content: "a " attr(typeof);
 }
 
 [about]:before {
@@ -114,16 +131,16 @@ meta[property] {
 
 /* TODO: order and test all combos of [property][rel][typeof][resource][href] */
 
+[rel],
 [property][resource],
-[property][href],
-[rel] {
-    outline: 1px solid #6da;
+[property][href] {
+    border: 1px solid #6da;
 }
 
+[rel],
 [property][typeof],
 [property][typeof][resource],
-[property][typeof][href],
-[rel] {
+[property][typeof][href] {
     background-color: #eff;
     display: inline-block;
     margin-top: 0.7em;
@@ -149,6 +166,11 @@ meta[property] {
 [resource][typeof]:before {
     color: purple;
     content: "<" attr(resource) "> a " attr(typeof);
+}
+
+[rel]:not([resource]):not([href]):before {
+    display: block;
+    margin: 0.5em 0;
 }
 
 [rel]:before,
