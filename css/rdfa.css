@@ -119,6 +119,10 @@ meta[property] {
     box-shadow: rgba(63, 0, 63, 0.4) 0em 0.1em 0.1em;
     border-radius: 7px;
 }
+[about],
+[typeof] {
+    margin-bottom: 0.8em;
+}
 
 [typeof]:before {
     content: "a " attr(typeof);
