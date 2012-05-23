@@ -4,6 +4,7 @@
 - Add support for date [datetime]
 - Add support for [datatype]
 - Add support for [lang]
+- Add support for [rev] as content: "^" attr(rev)
 - Add full reset+html5 css prelude?
 */
 
@@ -18,17 +19,17 @@ head > style, head > script {
 }
 
 body {
-  background-color: #fff;
-  color: #bbb;
-  font-family: sans-serif;
-  font-size: 80%;
-  margin: auto;
-  width: 80%;
-  max-width: 64em;
+    background-color: #fff;
+    color: #bbb;
+    font-family: sans-serif;
+    font-size: 80%;
+    margin: auto;
+    width: 80%;
+    max-width: 64em;
 }
 
-a, link {
-  color: #bbb;
+a[href], link[href] {
+  color: #6da !important;
   text-decoration: none;
 }
 
@@ -37,7 +38,7 @@ img, canvas {
 }
 
 link, meta {
-    border-style: dotted !important;
+    border: 1px dotted !important;
 }
 
 /* TODO: before(2) hardly supported; extend all(!) combos with vocab? E.g.:
@@ -78,7 +79,7 @@ meta[property],
 [property]:not([href]):not([resource]):not([typeof]):not([content]) {
     display: inline-block;
     margin-top: 0.7em;
-    border: 1px solid #ffa;
+    border: 1px solid #fe9;
     background-color: #ffe;
 }
 meta[property] {
@@ -133,8 +134,15 @@ meta[property] {
 
 [rel],
 [property][resource],
-[property][href] {
+[property][href],
+[property][href]:not([typeof]):before,
+[property][resource]:not([typeof]):before {
     border: 1px solid #6da;
+}
+
+[property][href]:not([typeof]),
+[property][resource]:not([typeof]) {
+    border: none;
 }
 
 [rel],
