@@ -37,32 +37,33 @@
   };
 
 
-  function NodeMap(data) {
-    this.context = new Context(data);
+  function Graph(ctx) {
+    this.context = new Context(ctx);
+    this.data = {};
   }
-  NodeMap.prototype = {
+  Graph.prototype = {
 
     toJSON: function () {
       var o = {},
         l = [];
-      for (p in this)
-        if (this.hasOwnProperty(p) && p !== 'context')
-          l.push(this[p]);
+      for (p in this.data)
+        if (this.hasOwnProperty(p))
+          l.push(this.data[p]);
       o[keys.CONTEXT] = this.context;
       o[keys.GRAPH] = l;
       return o;
     },
 
     toNode: function (id) {
-      var node = this[id];
+      var node = this.data[id];
       if (node === undefined) {
-        node = this[id] = new Node(id, this);
+        node = this.data[id] = new Node(id, this);
       }
       return node;
     },
 
     get: function (termOrCURIEorIRI) {
-      return this[this.context.resolve(termOrCURIEorIRI)];
+      return this.data[this.context.resolve(termOrCURIEorIRI)];
     }
 
   };
@@ -72,11 +73,11 @@
   Volatile.prototype = { toJSON: function () {} };
 
 
-  function Node(id, nodeMap) {
+  function Node(id, graph) {
     this[keys.ID] = id;
     this.referrersVia = new Volatile();
     this._properties = new Volatile();
-    this._nodeMap = nodeMap;
+    this._graph = graph;
   }
   Node.name = 'Node';
   Node.prototype = {
@@ -87,7 +88,7 @@
     toJSON: function () {
       var o = {};
       for (p in this)
-        if (p !== '_nodeMap' && this.hasOwnProperty(p))
+        if (p !== '_graph' && this.hasOwnProperty(p))
           o[p] = this[p];
       return o;
     },
@@ -104,7 +105,7 @@
     */
 
     addLink: function (rel, id) {
-      var object = this._nodeMap.toNode(id);
+      var object = this._graph.toNode(id);
       var relIRI = this.addToAllAndResolved(rel, object.toRef());
       var rev = object.referrersVia[rel];
       if (rev === undefined) {
@@ -131,7 +132,7 @@
         all = this[rel] = [];
       }
       all.push(item);
-      var relIRI = this._nodeMap.context.resolve(rel);
+      var relIRI = this._graph.context.resolve(rel);
       this._properties[relIRI] = all;
       return relIRI;
     },
@@ -141,10 +142,10 @@
       //cls.$(ns.label, 'lang(en)')[0]
       var result;
       if (path[0] === '^') {
-        var iri = this._nodeMap.context.resolve(path.substring(1));
+        var iri = this._graph.context.resolve(path.substring(1));
         result = this.referrersVia[iri];
       } else {
-        var iri = this._nodeMap.context.resolve(path);
+        var iri = this._graph.context.resolve(path);
         result = this._properties[iri];
       }
       if (result === undefined)
@@ -166,11 +167,11 @@
   };
 
 
-  function Literal(value, lang, datatype, nodeMap) {
+  function Literal(value, lang, datatype, graph) {
     this[keys.VALUE] = value;
     this[keys.TYPE] = datatype;
     this[keys.LANG] = lang;
-    this._nodeMap = nodeMap;
+    this._graph = graph;
   }
   Literal.name = 'Literal';
   Literal.prototype = {
@@ -194,25 +195,25 @@
   };
 
 
-  function List(nodeMap) {
+  function List(graph) {
     this[keys.LIST] = [];
-    this._nodeMap = nodeMap;
+    this._graph = graph;
   }
   List.name = 'List';
   List.prototype = { _ctor: List };
 
 
-  var parse = function (source, context) {
-    var nodeMap = new NodeMap(context);
+  function graphify(source, context) {
+    var graph = new Graph(context);
     // TODO: vary for set, object or graph..
     for (var it=null, i=0; it=source[i++];) {
-      importItem(nodeMap, it);
+      importItem(graph, it);
     }
-    return nodeMap;
-  };
+    return graph;
+  }
 
-  function importItem(nodeMap, item) {
-    var node = nodeMap.toNode(item[keys.ID]);
+  function importItem(graph, item) {
+    var node = graph.toNode(item[keys.ID]);
     for (var p in item) {
       if (p === keys.ID) {
         continue;
@@ -220,27 +221,27 @@
       var o = item[p];
       if (o instanceof Array) {
         for (var i=0, it=null; it=o[i++];) {
-          addItem(nodeMap, node, p, it);
+          addItem(graph, node, p, it);
         }
       } else {
-        addItem(nodeMap, node, p, o);
+        addItem(graph, node, p, o);
       }
     }
   }
 
-  function addItem(nodeMap, node, p, o) {
+  function addItem(graph, node, p, o) {
     // TODO: list, coercion...
     if (o[keys.ID]) {
       node.addLink(p, o[keys.ID]);
-      importItem(nodeMap, o);
+      importItem(graph, o);
     } else {
       node.addValue(p, o[keys.VALUE], o[keys.LANG], o[keys.TYPE]);
     }
   }
 
 
-  exports.parse = parse;
-  exports.NodeMap = NodeMap;
+  exports.graphify = graphify;
+  exports.Graph = Graph;
   exports.Context = Context;
   exports.Node = Node;
   exports.Literal = Literal;

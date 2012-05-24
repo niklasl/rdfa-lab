@@ -26,10 +26,10 @@ var ctxt = {
   name: "foaf:name"
 };
 
-var nodeMap = LD.parse(source, ctxt);
+var graph = LD.graphify(source, ctxt)
 
 console.log("\n## Compact usage ##")
-nodeMap[ctxt.Class].referrersVia.type.forEach(function (cls) {
+graph.data[ctxt.Class].referrersVia.type.forEach(function (cls) {
   console.log("class: " + cls)
   console.log("  label: " + cls.label[0])
   if (cls.subClassOf) {
@@ -44,7 +44,7 @@ nodeMap[ctxt.Class].referrersVia.type.forEach(function (cls) {
 })
 
 console.log("\n## RDF API usage ##")
-nodeMap.get('rdfs:Class').find('^rdf:type').forEach(function (cls) {
+graph.get('rdfs:Class').find('^rdf:type').forEach(function (cls) {
   console.log("class: " + cls)
   console.log("  label: " + cls.find('http://www.w3.org/2000/01/rdf-schema#label',0))
   //sup.$(ns.label, "en", 0)
@@ -59,7 +59,7 @@ nodeMap.get('rdfs:Class').find('^rdf:type').forEach(function (cls) {
 
 
 console.log("\n## Serializing ##")
-console.log(JSON.stringify(nodeMap/*, null, 2*/))
+console.log(JSON.stringify(graph/*, null, 2*/))
 
 
 /** Specs... **/
