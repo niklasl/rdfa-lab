@@ -1,72 +1,57 @@
 var LD = require('../js/ld')
 
-
 var source = [
   {
     "@id": "http://example.org/vocab#Thing",
-    "type": {"@id": "http://www.w3.org/2000/01/rdf-schema#Class"},
-    "label": [{"@value": "Thing", "@language": "en"}]
+    "@type": "http://www.w3.org/2000/01/rdf-schema#Class",
+    "http://www.w3.org/2000/01/rdf-schema#label": [{"@value": "Thing", "@language": "en"}]
   },
   {
     "@id": "http://example.org/vocab#Item",
-    "type": {"@id": "http://www.w3.org/2000/01/rdf-schema#Class"},
-    "label": [{"@value": "Item", "@language": "en"}],
-    "subClassOf": [{"@id": "http://example.org/vocab#Thing"}]
+    "@type": "http://www.w3.org/2000/01/rdf-schema#Class",
+    "http://www.w3.org/2000/01/rdf-schema#label": [{"@value": "Item", "@language": "en"}],
+    "http://www.w3.org/2000/01/rdf-schema#subClassOf": [{"@id": "http://example.org/vocab#Thing"}]
   }
-];
+]
 
-var ctxt = {
-  rdf: "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+var ctx = {
   rdfs: "http://www.w3.org/2000/01/rdf-schema#",
-  type: "http://www.w3.org/1999/02/22-rdf-syntax-ns#type",
-  Class: "http://www.w3.org/2000/01/rdf-schema#Class",
-  subClassOf: "http://www.w3.org/2000/01/rdf-schema#subClassOf",
-  label: "http://www.w3.org/2000/01/rdf-schema#label",
-  foaf: "http://xmlns.com/foaf/0.1/",
-  name: "foaf:name"
-};
+  iri: "@id",
+  type: "@type",
+  Class: "rdfs:Class",
+  subClassOf: {"@id": "rdfs:subClassOf", "@container": "@set"},
+  label: "rdfs:label",
+  "@language": "en",
+  //all: {"@id": "@graph", "@container": "@id"},
+  byType: {"@id": "@graph", "@container": "@type"},
+  //rev: "@rev",
+  //instances: {"@rev": "type"},
+  subclasses: {"@rev": "subClassOf"}
+}
 
-var graph = LD.graphify(source, ctxt)
+var data = LD.connect(source, ctx)
 
 console.log("\n## Compact usage ##")
-graph.data[ctxt.Class].referrersVia.type.forEach(function (cls) {
-  console.log("class: " + cls)
-  console.log("  label: " + cls.label[0])
+//data.all.Class.instances.forEach(function (cls) {
+//data.all.Class.via.type.forEach(function (cls) {
+data.byType.Class.forEach(function (cls) {
+  console.log("class: " + cls.iri)
+  console.log("  label: " + cls.label)
   if (cls.subClassOf) {
     cls.subClassOf.forEach(function (sup) {
-      console.log("  subClassOf: " + sup.label[0])
+      console.log("  subClassOf: " + sup.label)
     })
   }
-  if (cls.referrersVia.subClassOf) {
-    console.log("  subclasses: " + cls.referrersVia.subClassOf.map(
-      function (it) { return it.label[0] }).join(", "))
+  if (cls.subclasses) {
+    console.log("  subclasses: " + cls.subclasses.map(
+      function (it) { return it.label }).join(", "))
   }
 })
 
-console.log("\n## RDF API usage ##")
-graph.get('rdfs:Class').find('^rdf:type').forEach(function (cls) {
-  console.log("class: " + cls)
-  console.log("  label: " + cls.find('http://www.w3.org/2000/01/rdf-schema#label',0))
-  //sup.$(ns.label, "en", 0)
-  cls.find('rdfs:subClassOf').forEach(function (sup) {
-    console.log("  subClassOf: " + sup.find('rdfs:label',0))
-  })
-  var subclasses = cls.find('^rdfs:subClassOf').map(
-    function (it) { return it.find('rdfs:label',0) })
-  if (subclasses.length)
-    console.log("  subclasses: " + subclasses.join(", "))
-})
-
+//data.add(cls, 'subClassOf', sup)
+//data.remove(cls, 'subClassOf', sup)
+//data.add(cls, '@type', 'owl:Class')
 
 console.log("\n## Serializing ##")
-console.log(JSON.stringify(graph/*, null, 2*/))
+console.log(JSON.stringify(data, null, 2))
 
-
-/** Specs... **/
-// given:
-var node = new LD.Node("_:123");
-var ref = node.toRef();
-node.prop = "avalue";
-// expect:
-ref.prop == "avalue"
-ref.toJSON() == {"@id": "_:123"}

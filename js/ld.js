@@ -1,249 +1,190 @@
 (function (exports) {
 
-  var keys = {
-    CONTEXT: '@context',
-    ID: '@id',
-    TYPE: '@type',
-    VALUE: '@value',
-    LANG: '@language',
-    LIST: "@list",
-    GRAPH: "@graph"
-  };
-
-
-  function Context(data) {
-    this.data = data || {};
-    // TODO: parse context data (curie refs, coercions, containers)
+  if (typeof jsonld === 'undefined' && typeof require === 'function') {
+    var jsonld = require('jsonld');
   }
-  Context.prototype = {
 
-    toJSON: function () {
-      return this.data;
-    },
+  var CONTEXT = '@context';
+  var ID = '@id';
+  var TYPE = '@type';
+  var CONTAINER = '@container';
+  var GRAPH = "@graph";
+  var REV = "@rev";
 
-    resolve: function (termOrCURIEorIRI) {
-      var def = this.data[termOrCURIEorIRI];
-      if (def == undefined) {
-        var parts = termOrCURIEorIRI.split(':');
-        var ns = this.data[parts[0]];
-        if (ns !== undefined) {
-          return ns + parts[1];
+  var compactSync = exports.compactSync = function (source, context) {
+    // TODO: make async or promote this version
+    var result, error;
+    jsonld.compact(source, context, function (err, out) {
+      result = out, error = err;
+    });
+    while (result === undefined && error === undefined) { ; }
+    return {result: result, error: error};
+  }
+
+  var connect = exports.connect = function (source, context) {
+    return new Connector(context).connect(source);
+  }
+
+  function Connector(context) {
+    this.regularCtx = {};
+    this.revs = {};
+    this.idKey = ID;
+    this.typeKey = TYPE;
+    this.idMapKey = null;
+    this.idMap = new Volatile();
+    this.typeMapKey = null;
+    this.typeMap = null;
+
+    for (var key in context) {
+      var value = context[key],
+        isObj = typeof value === 'object';
+      if (value === '@id') {
+        this.idKey = key;
+      } else if (value === '@type') {
+        this.typeKey = key;
+      }
+      if (isObj && REV in value) {
+        this.revs[value[REV]] = key;
+      } else if (isObj && value[ID] === GRAPH) {
+        if (value[CONTAINER] === ID) {
+          this.idMapKey = key;
+        } else if (value[CONTAINER] === TYPE) {
+          this.typeMapKey = key;
         }
-        return termOrCURIEorIRI;
+      } else {
+        this.regularCtx[key] = value;
       }
-      return (typeof def === 'string')? def : def[keys.ID];
     }
-
-  };
-
-
-  function Graph(ctx) {
-    this.context = new Context(ctx);
-    this.data = {};
   }
-  Graph.prototype = {
 
-    toJSON: function () {
-      var o = {},
-        l = [];
-      for (p in this.data)
-        if (this.hasOwnProperty(p))
-          l.push(this.data[p]);
-      o[keys.CONTEXT] = this.context;
-      o[keys.GRAPH] = l;
-      return o;
-    },
+  Connector.prototype = {
 
-    toNode: function (id) {
-      var node = this.data[id];
-      if (node === undefined) {
-        node = this.data[id] = new Node(id, this);
+    connect: function (source) {
+      var data = compactSync(source, this.regularCtx);
+      if (data.error) { throw data.error; }
+      var result = data.result;
+
+      var resources = result[GRAPH] || [result];
+      if (this.idMapKey) {
+        result[this.idMapKey] = this.idMap;
       }
-      return node;
+      if (this.typeMapKey) {
+        result[this.typeMapKey] = this.typeMap = new Volatile();
+      }
+      // TODO: don't mutate; copy keys if hasOwnProperty (even funcs though)
+      // .. loop over object or array..
+      for (var i in resources) {
+        if (resources.hasOwnProperty && resources.hasOwnProperty(i)) {
+          this.connectNode(resources[i]);
+        }
+      }
+      // TODO: too complex to add?
+      //var self = this;
+      //result.add = function (s, p, o) { self.add(s, p, o) };
+      //result.remove = function (s, p, o) { self.remove(s, p, o); };
+      return result;
     },
 
-    get: function (termOrCURIEorIRI) {
-      return this.data[this.context.resolve(termOrCURIEorIRI)];
+    connectNode: function (node) {
+      for (var p in node) {
+        var o = node[p];
+        if (p === this.idKey) {
+          this.idMap[o] = node;
+        } else if (o instanceof Array) {
+          var items = node[p] = [];
+          for (var i=0, it=null; it=o[i++];) {
+            var ref = this.importNode(it);
+            items.push(ref);
+            this.addRev(node, p, it);
+            if (p === TYPE) {
+              this.mapType(o, node);
+            }
+          }
+        } else {
+          var ref = node[p] = this.importNode(o);
+          this.addRev(node, p, o);
+          if (p === this.typeKey) {
+            this.mapType(o, node);
+          }
+        }
+      }
+    },
+
+    mapType: function (type, node) {
+      var types = this.typeMap[type];
+      if (types === undefined) {
+        types = this.typeMap[type] = [];
+      }
+      types.push(node);
+    },
+
+    importNode: function (node) {
+      if (node[this.idKey]) {
+        return toRef(this.idMap[node[this.idKey]], this.idKey);
+      } else {
+        if (node instanceof Object) {
+          this.connectNode(node);
+        }
+        return node;
+      }
+    },
+
+    addRev: function (subj, p, obj) {
+      var revProp = this.revs[p];
+      if (revProp) {
+        var realObj = this.idMap[obj[this.idKey]];
+        var revSet = realObj[revProp];
+        if (revSet === undefined) {
+          revSet = [];
+          revSet.toJSON = function () {};
+          realObj[revProp] = revSet;
+        }
+        if (subj instanceof Object/* && revSet[subj[this.idKey]] === undefined*/) {
+          revSet.push(subj);
+          //revSet[subj[this.idKey]] = subj;
+        }
+      }
     }
 
-  };
+    /* TODO: too complex to add?
+    , add: function (s, p, o) {
+      if (typeof s === 'string') {
+        this.idMap[s];
+      } else if (this.idMap[s[this.idKey] === undefined]) {
+        s = importNode(s);
+      }
+      s[p] = o;
+      var oId = o[this.idKey];
+      if (oId) {
+        if (this.idMap[oId] === undefined) {
+          o = this.importNode(o);
+        }
+        this.addRev(s, p, o);
+      }
+      if (p === this.typeKey) {
+        this.mapType(o, s);
+      }
+    },
 
+    remove: function (s, p, o) {
+      // ...
+    }
+    */
+
+  };
 
   function Volatile() {}
   Volatile.prototype = { toJSON: function () {} };
 
-
-  function Node(id, graph) {
-    this[keys.ID] = id;
-    this.referrersVia = new Volatile();
-    this._properties = new Volatile();
-    this._graph = graph;
-  }
-  Node.name = 'Node';
-  Node.prototype = {
-    _ctor: Node,
-
-    toString: function () { return this[keys.ID]; },
-
-    toJSON: function () {
-      var o = {};
-      for (p in this)
-        if (p !== '_graph' && this.hasOwnProperty(p))
-          o[p] = this[p];
-      return o;
-    },
-
-    /*
-    TODO: Called if one item, if container is not @set and not adding set of
-    items, don't use all (only if user-defined context is provided?)
-
-    setLink: function (rel, id) {
-    },
-
-    setLiteral: function (rel, value, lang, datatype) {
-    },
-    */
-
-    addLink: function (rel, id) {
-      var object = this._graph.toNode(id);
-      var relIRI = this.addToAllAndResolved(rel, object.toRef());
-      var rev = object.referrersVia[rel];
-      if (rev === undefined) {
-        rev = [];
-        object.referrersVia[rel] = rev;
-        object.referrersVia[relIRI] = rev;
-      }
-      if (rev[this[keys.ID]] === undefined) {
-        var ref = this.toRef();
-        rev.push(ref);
-        rev[this[keys.ID]] = ref;
-      }
-    },
-
-    addValue: function (rel, value, lang, datatype) {
-      // TODO: check if really literal or coerced...
-      var literal = new Literal(value, lang, datatype);
-      this.addToAllAndResolved(rel, literal);
-    },
-
-    addToAllAndResolved: function (rel, item) {
-      var all = this[rel];
-      if (all === undefined) {
-        all = this[rel] = [];
-      }
-      all.push(item);
-      var relIRI = this._graph.context.resolve(rel);
-      this._properties[relIRI] = all;
-      return relIRI;
-    },
-
-    find: function (path, idx) {
-      // IMP: CURIEorIRIorSPARQLPropertyPath, LangOrSPARQLFilter?
-      //cls.$(ns.label, 'lang(en)')[0]
-      var result;
-      if (path[0] === '^') {
-        var iri = this._graph.context.resolve(path.substring(1));
-        result = this.referrersVia[iri];
-      } else {
-        var iri = this._graph.context.resolve(path);
-        result = this._properties[iri];
-      }
-      if (result === undefined)
-        return [];
-      else if (idx !== undefined)
-        return result[idx];
-      else
-        return result;
-    },
-
-    toRef: function () {
-      function Ref() {}
-      Ref.prototype = this;
-      var ref = new Ref();
-      ref.toJSON = function () { return {"@id": this[keys.ID]}; };
-      return ref;
-    }
-
-  };
-
-
-  function Literal(value, lang, datatype, graph) {
-    this[keys.VALUE] = value;
-    this[keys.TYPE] = datatype;
-    this[keys.LANG] = lang;
-    this._graph = graph;
-  }
-  Literal.name = 'Literal';
-  Literal.prototype = {
-    _ctor: Literal,
-
-    toString: function () { return this[keys.VALUE]; },
-
-    toNumber: function () {},
-
-    toBoolean: function () {},
-
-    toDate: function () {},
-
-    toObject: function () {
-      return this.toDate() ||
-        this.toBoolean() ||
-          this.toNumber() ||
-            this.toString();
-    }
-
-  };
-
-
-  function List(graph) {
-    this[keys.LIST] = [];
-    this._graph = graph;
-  }
-  List.name = 'List';
-  List.prototype = { _ctor: List };
-
-
-  function graphify(source, context) {
-    var graph = new Graph(context);
-    // TODO: vary for set, object or graph..
-    for (var it=null, i=0; it=source[i++];) {
-      importItem(graph, it);
-    }
-    return graph;
+  function toRef(obj, idKey) {
+    function Ref() {}
+    Ref.prototype = obj;
+    var ref = new Ref();
+    ref.toJSON = function () { return {"@id": this[idKey]}; };
+    return ref;
   }
 
-  function importItem(graph, item) {
-    var node = graph.toNode(item[keys.ID]);
-    for (var p in item) {
-      if (p === keys.ID) {
-        continue;
-      }
-      var o = item[p];
-      if (o instanceof Array) {
-        for (var i=0, it=null; it=o[i++];) {
-          addItem(graph, node, p, it);
-        }
-      } else {
-        addItem(graph, node, p, o);
-      }
-    }
-  }
-
-  function addItem(graph, node, p, o) {
-    // TODO: list, coercion...
-    if (o[keys.ID]) {
-      node.addLink(p, o[keys.ID]);
-      importItem(graph, o);
-    } else {
-      node.addValue(p, o[keys.VALUE], o[keys.LANG], o[keys.TYPE]);
-    }
-  }
-
-
-  exports.graphify = graphify;
-  exports.Graph = Graph;
-  exports.Context = Context;
-  exports.Node = Node;
-  exports.Literal = Literal;
+  //bnodeCounter
+  //(new Date().getTime()).toString(16) + bnodeCount
 
 })(typeof exports !== 'undefined'? exports : LD = {});
