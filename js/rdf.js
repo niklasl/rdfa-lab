@@ -129,7 +129,12 @@
     toString: function () { return this.id; },
 
     toJSON: function () {
-      return this.properties;
+      var o = {}, props = this.properties;
+      o[keys.ID] = this.id;
+      for (var p in props) {
+        o[p] = props[p];
+      }
+      return o;
     },
 
     get: function (path) {
@@ -200,15 +205,23 @@
 
 
   function Literal(value, lang, datatype, graph) {
-    this[keys.VALUE] = value;
-    this[keys.TYPE] = datatype;
-    this[keys.LANG] = lang;
+    this.value = value;
+    this.datatype = datatype;
+    this.lang = lang;
     this.graph = graph;
   }
   Literal.prototype = {
     constructor: Literal,
 
-    toString: function () { return this[keys.VALUE]; },
+    toString: function () { return this.value; },
+
+    toJSON: function () {
+      var o = {};
+      o[keys.VALUE] = this.value;
+      if (this.type) o[keys.TYPE] = this.datatype;
+      if (this.lang) o[keys.LANG] = this.lang;
+      return o;
+    },
 
     asNumber: function () {}, // TODO
 
@@ -226,14 +239,17 @@
   };
 
 
-  function toList(list) {
-    function L() {}
-    L.prototype = list;
-    var wrapped = new L;
-    wrapped.toJSON = function () {
-        return {"@list": base};
+  //function List(array) {
+  //  this.items = array;
+  //}
+  function toList(array) {
+    var copy = array.slice();
+    // TODO: change use of constructor to an attribute for type?
+    copy.type = 'list';
+    copy.toJSON = function () {
+      var o = {}; o[keys.LIST] = array; return o;
     }
-    return wrapped;
+    return copy;
   }
 
 
