@@ -11,12 +11,19 @@
   # TODO:
   # - modularize and complete profile support (default context etc.)
   # - resolve datatype and match IRI for rdf:XMLLiteral
+  # - xml:lang, xmlns:*
+  # - more flat (add first occurrence of @id to graph and fill in that)
+  # NEXT:
+  # - attach (non-enumerable) function for getSource (for an RDFa:ish API)
+  #   - source as map of property -> subjectElement, objectElement (no hanging for now)
+  # NEXT:
   # - fix interplay of about, property, rel/rev, typeof
   # - fix hanging rev
   # - if hanging and prop/rel/rev: inject bnode
-  # - xml:lang, xmlns:*
-  # maybe:
-  # - map first occurrence of an @id and fill in that?
+  # - determine strategy for "pathological" input (e.g. redef. prefixes)
+  # DEFERRED:
+  # - flag to build context and keep compact or produce expanded json-ld?
+  # - for compaction with custom context: feed into an JSON-LD API impl.
   class module.Extract
 
     constructor: (@doc, @base=@doc.documentURI) ->
@@ -63,10 +70,10 @@
       if attrs.vocab?.value
         vocab = attrs.vocab.value
         ctxt.update('rdfa', RDFA_IRI)
-        @top['rdfa:usesVocabulary'] = vocab
+        @top['rdfa:usesVocabulary'] = {'@id': vocab}
       if attrs.prefix?.value
         pfxs = attrs.prefix.value.replace(/^\s+|\s+$/g, "").split(/:?\s+/)
-        for i in [0..pfxs.length] by 2
+        for i in [0...pfxs.length] by 2
           pfx = pfxs[i]
           ns = pfxs[i+1]
           ctxt.update(pfx, ns)
