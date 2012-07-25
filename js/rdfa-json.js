@@ -2,16 +2,16 @@
 (function() {
   var RDFaJSON;
 
-  (function(module) {
+  (function(exports) {
     var Context, RDFA_IRI, RDF_IRI, XSD_IRI;
-    module.extract = function(doc, base) {
+    exports.extract = function(doc, base) {
       var extract;
       doc || (doc = window.document);
-      extract = new module.Extract(doc, base);
+      extract = new exports.Extract(doc, base);
       extract.run();
       return extract;
     };
-    module.Extract = (function() {
+    exports.Extract = (function() {
 
       Extract.name = 'Extract';
 
@@ -20,7 +20,7 @@
         this.doc = doc;
         this.base = base != null ? base : this.doc.documentURI;
         this.profile = 'html';
-        this.defaultCtxt = module.contexts[this.profile];
+        this.defaultCtxt = exports.contexts[this.profile];
         if (this.profile === 'html') {
           baseEl = this.doc.getElementsByTagName('base')[0];
           if (baseEl) {
@@ -297,7 +297,7 @@
       return Context;
 
     })();
-    module.contexts = {
+    exports.contexts = {
       html: {
         "grddl": "http://www.w3.org/2003/g/data-view#",
         "ma": "http://www.w3.org/ns/ma-ont#",
@@ -332,9 +332,9 @@
         "role": "http://www.w3.org/1999/xhtml/vocab#role"
       }
     };
-    RDF_IRI = module.contexts.html.rdf;
-    XSD_IRI = module.contexts.html.xsd;
-    return RDFA_IRI = module.contexts.html.rdfa;
+    RDF_IRI = exports.contexts.html.rdf;
+    XSD_IRI = exports.contexts.html.xsd;
+    return RDFA_IRI = exports.contexts.html.rdfa;
   })(typeof exports !== "undefined" && exports !== null ? exports : RDFaJSON = {});
 
 }).call(this);

@@ -1,9 +1,9 @@
 # module namespace; works both in browser and node
-((module) ->
+((exports) ->
 
-  module.extract = (doc, base) ->
+  exports.extract = (doc, base) ->
     doc or= window.document
-    extract = new module.Extract(doc, base)
+    extract = new exports.Extract(doc, base)
     extract.run()
     return extract
 
@@ -24,11 +24,11 @@
   # DEFERRED:
   # - flag to build context and keep compact or produce expanded json-ld?
   # - for compaction with custom context: feed into an JSON-LD API impl.
-  class module.Extract
+  class exports.Extract
 
     constructor: (@doc, @base=@doc.documentURI) ->
       @profile = 'html'
-      @defaultCtxt = module.contexts[@profile]
+      @defaultCtxt = exports.contexts[@profile]
       if @profile == 'html'
         baseEl = @doc.getElementsByTagName('base')[0]
         if baseEl then @base = baseEl.href
@@ -233,7 +233,7 @@
           return null
       return key
 
-  module.contexts =
+  exports.contexts =
     html: {
       "grddl": "http://www.w3.org/2003/g/data-view#",
       "ma": "http://www.w3.org/ns/ma-ont#",
@@ -268,8 +268,8 @@
       "role": "http://www.w3.org/1999/xhtml/vocab#role"
     }
 
-  RDF_IRI = module.contexts.html.rdf
-  XSD_IRI = module.contexts.html.xsd
-  RDFA_IRI = module.contexts.html.rdfa
+  RDF_IRI = exports.contexts.html.rdf
+  XSD_IRI = exports.contexts.html.xsd
+  RDFA_IRI = exports.contexts.html.rdfa
 
 )(exports ? RDFaJSON = {})
