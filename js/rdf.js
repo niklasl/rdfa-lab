@@ -1,32 +1,21 @@
 (function (exports) {
 
-  var keys = {
-    CONTEXT: '@context',
-    ID: '@id',
-    TYPE: '@type',
-    VALUE: '@value',
-    LANG: '@language',
-    LIST: "@list",
-    GRAPH: "@graph"
-  };
-
   var RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
 
 
   function Graph(mappings) {
-    this.resolver = new Resolver(mappings);
-    this.idMap = {};
-    this.bnodePrefix = "_:gen-" + (new Date().getTime()).toString(16) + "-";
-    this.bnodeCounter = 0;
+    this.nodes = {};
+    this.resolve = resolver(mappings);
+    this.nextBNodeID = bnodeCounter();
   }
   Graph.prototype = {
 
     get: function (termOrCURIEorIRI) {
-      return this.idMap[this.resolver.resolve(termOrCURIEorIRI)];
+      return this.nodes[this.resolve(termOrCURIEorIRI)];
     },
 
     all: function () {
-      var result = [], map = this.idMap;
+      var result = [], map = this.nodes;
       for (var id in map) {
         result.push(map[id]);
       }
@@ -41,94 +30,53 @@
       return result;
     },
 
-    importItem: function (item) {
-      var node = this.toNode(item[keys.ID]); // TODO: item.getSource()
-      for (var p in item) {
-        if (p === keys.ID) {
-          continue;
-        }
-        var o = item[p];
-        if (o instanceof Array) {
-          for (var i=0, it=null; it=o[i++];) {
-            this.addObject(node, p, it);
-          }
-        } else {
-          this.addObject(node, p, o);
-        }
-      }
-      return node;
-    },
-
     toNode: function (id) {
       if (!id) {
         id = this.nextBNodeID();
       }
-      var node = this.idMap[id];
+      var node = this.nodes[id];
       if (node === undefined) {
-        node = this.idMap[id] = new Node(id, this);
+        node = this.nodes[id] = new Node(id, this);
       }
       return node;
     },
 
-    nextBNodeID: function () {
-      return this.bnodePrefix + this.bnodeCounter++;
-    },
-
-    addObject: function (node, p, o) {
-      if (p === keys.TYPE) {
-        p = RDF_TYPE;
-        if (typeof o === 'string') {
-          o = {"@id": o};
-        }
-      }
-      if (o[keys.VALUE]) {
-        node.addValue(p, o[keys.VALUE], o[keys.LANG], o[keys.TYPE]);
-      } else if (o[keys.LIST]) {
-        // TODO: new List
-        var items = o[keys.LIST], list = [];
-        for (var it=null, i=0; it=items[i++];) {
-          list.push(this.importItem(it));
-        }
-        node.add(p, toList(list));
-      } else {
-        var target = this.importItem(o);
-        node.addLink(p, target.id);
-      }
+    importJSON: function (data) {
+      ld.importData(this, data);
     },
 
     toJSON: function () {
       var l = [];
-      for (var p in this.idMap)
-        if (this.hasOwnProperty(p))
-          l.push(this.idMap[p].toJSON());
+      for (var p in this.nodes) {
+        l.push(this.nodes[p]);
+      }
       return l;
     }
 
   };
 
-  function Resolver(mappings) {
-    var map = this.map = {};
-    for (key in mappings) {
-      var val = mappings[key];
-      if (typeof val === 'string') {
-        map[key] = val;
-      } else if (val[keys.ID]) {
-        map[key] = val[keys.ID];
+  function resolver(map) {
+    return function (termOrCURIEorIRI) {
+      var dfn = map[termOrCURIEorIRI];
+      if (dfn == undefined) {
+        var parts = termOrCURIEorIRI.split(':');
+        var ns = map[parts[0]];
+        if (ns !== undefined) {
+          return ns + parts[1];
+        }
+        return termOrCURIEorIRI;
       }
-    }
+      return (typeof dfn === 'string')? dfn : dfn[ld.ID];
+    };
   }
-  Resolver.prototype.resolve = function (termOrCURIEorIRI) {
-    var def = this.map[termOrCURIEorIRI];
-    if (def == undefined) {
-      var parts = termOrCURIEorIRI.split(':');
-      var ns = this.map[parts[0]];
-      if (ns !== undefined) {
-        return ns + parts[1];
-      }
-      return termOrCURIEorIRI;
-    }
-    return (typeof def === 'string')? def : def[keys.ID];
-  };
+
+  function bnodeCounter() {
+    var prefix = "_:gen-" + (new Date().getTime()).toString(16) + "-",
+      count = 0;
+    return function () {
+      return prefix + count++;
+    };
+  }
 
 
   function Node(id, graph) {
@@ -138,35 +86,57 @@
     this.incoming = {};
   }
   Node.prototype = {
-    constructor: Node,
+
+    typeName: 'Node',
 
     toString: function () { return this.id; },
 
     toJSON: function () {
       var o = {}, props = this.properties;
-      o[keys.ID] = this.id;
+      o[ld.ID] = this.id;
       for (var p in props) {
         o[p] = props[p];
       }
       return o;
     },
 
-    get: function (path, /*optional*/ params) {
-      return this.getAll(path, params)[0];
+    get: function (path) {
+      return this.getAll(path)[0];
     },
 
-    getAll: function (path, /*optional*/ params) {
-      var result,
-        rev = params !== undefined && params.reverse;
-      if (path[0] === '^') {
-        path = path.substring(1);
-        rev = true;
-      }
-      if (rev) {
-        var iri = this.graph.resolver.resolve(path);
+    getAll: function (path) {
+      var params = (typeof path === 'string')? parsePropertyPath(path) : path;
+      return this.find(params);
+    },
+
+    getType: function () {
+      return this.find({term: RDF_TYPE})[0];
+    },
+
+    getTypes: function () {
+      return this.find({term: RDF_TYPE});
+    },
+
+    getReverse: function (term) {
+      return this.find({reverse: term})[0];
+    },
+
+    getAllReverse: function (term) {
+      return this.find({reverse: term});
+    },
+
+    getList: function (path) {
+      var l = this.get(path)
+      return l? l.list : [];
+    },
+
+    find: function (params) {
+      var result;
+      if (params.reverse) {
+        var iri = this.graph.resolve(params.reverse);
         result = this.incoming[iri];
       } else {
-        var iri = this.graph.resolver.resolve(path);
+        var iri = this.graph.resolve(params.term);
         result = this.properties[iri];
       }
       if (result === undefined)
@@ -175,33 +145,17 @@
         return result;
     },
 
-    getType: function () {
-      return this.get(RDF_TYPE);
-    },
-
-    getTypes: function () {
-      return this.getAll(RDF_TYPE);
-    },
-
-    getReverse: function (term) {
-      return this.get(term, {reverse: true});
-    },
-
-    getAllReverse: function (term) {
-      return this.getAll(term, {reverse: true});
-    },
-
     addLink: function (rel, id) {
       var object = this.graph.toNode(id);
-      var rel = this.graph.resolver.resolve(rel);
-      this.add(rel, object.toRef());
+      var rel = this.graph.resolve(rel);
+      this.add(rel, toRef(object));
       var rev = object.incoming[rel];
       if (rev === undefined) {
         rev = [];
         object.incoming[rel] = rev;
       }
       if (rev[this.id] === undefined) {
-        var ref = this.toRef();
+        var ref = toRef(this);
         rev.push(ref);
         rev[this.id] = ref;
       }
@@ -213,30 +167,44 @@
       this.add(rel, literal);
     },
 
+    addList: function (p, list) {
+      this.add(p, new List(list));
+    },
+
     /*
     TODO: ...
     setLink: function (rel, id) { },
-    setLiteral: function (rel, value, lang, datatype) { },
+    setValue: function (rel, value, lang, datatype) { },
     remove...
     */
 
-    add: function (rel, item) {
+    add: function (rel, obj) {
       var all = this.properties[rel];
       if (all === undefined) {
         all = this.properties[rel] = [];
       }
-      all.push(item);
-    },
-
-    toRef: function () {
-      function Ref() {}
-      Ref.prototype = this;
-      var ref = new Ref();
-      ref.toJSON = function () { return {"@id": this[keys.ID]}; };
-      return ref;
+      all.push(obj);
     }
 
   };
+
+  function parsePropertyPath(path) {
+    if (path[0] === '^') {
+      return {reverse: path.substring(1)};
+    } else {
+      return {term: path};
+    }
+  }
+
+  function toRef(obj) {
+    function Ref() {}
+    Ref.prototype = obj;
+    var ref = new Ref();
+    ref.toJSON = function () {
+      var o = {}; o[ld.ID] = obj.id; return o;
+    };
+    return ref;
+  }
 
 
   function Literal(value, language, datatype, graph) {
@@ -246,15 +214,16 @@
     this.graph = graph;
   }
   Literal.prototype = {
-    constructor: Literal,
+
+    typeName: 'Literal',
 
     toString: function () { return this.value; },
 
     toJSON: function () {
       var o = {};
-      o[keys.VALUE] = this.value;
-      if (this.type) o[keys.TYPE] = this.datatype;
-      if (this.language) o[keys.LANG] = this.language;
+      o[ld.VALUE] = this.value;
+      if (this.type) o[ld.TYPE] = this.datatype;
+      if (this.language) o[ld.LANG] = this.language;
       return o;
     },
 
@@ -276,39 +245,95 @@
   };
 
 
-  //function List(array) {
-  //  this.items = array;
-  //}
-  function toList(array) {
-    var copy = array.slice();
-    // TODO: change use of constructor to an attribute for type?
-    copy.type = 'list';
-    copy.toJSON = function () {
-      var o = {}; o[keys.LIST] = array; return o;
-    }
-    return copy;
+  function List(array) {
+    this.list = array;
   }
-
-
-  function toGraph(source, mappings) {
-    var graph = new Graph(mappings);
-    for (var it=null, i=0; it=source[i++];) {
-      graph.importItem(it);
+  List.prototype = {
+    typeName: 'List',
+    toJSON: function () {
+      var o = {}; o[ld.LIST] = this.list;
+      return o;
     }
+  };
+
+
+  var ld = {
+
+    CONTEXT: '@context',
+    ID: '@id',
+    TYPE: '@type',
+    VALUE: '@value',
+    LANG: '@language',
+    LIST: "@list",
+    GRAPH: "@graph",
+
+    importData: function (graph, data) {
+      for (var it=null, i=0; it=data[i++];) {
+        this.importItem(graph, it);
+      }
+    },
+
+    importItem: function (graph, item) {
+      var node = graph.toNode(item[this.ID]); // TODO: item.getSource()
+      for (var p in item) {
+        if (p === this.ID) {
+          continue;
+        }
+        var o = item[p];
+        if (o instanceof Array) {
+          for (var i=0, it=null; it=o[i++];) {
+            this.addItem(graph, node, p, it);
+          }
+        } else {
+          this.addItem(graph, node, p, o);
+        }
+      }
+      return node;
+    },
+
+    addItem: function (graph, node, p, item) {
+      if (p === this.TYPE) {
+        p = RDF_TYPE;
+        if (typeof item === 'string') {
+          item = {"@id": item};
+        }
+      }
+      if (item[this.VALUE]) {
+        node.addValue(p, item[this.VALUE], item[this.LANG], item[this.TYPE]);
+      } else if (item[this.LIST]) {
+        var items = item[this.LIST],
+          list = [];
+        for (var it=null, i=0; it=items[i++];) {
+          // FIXME: toRef? Or just add id:s?
+          list.push(this.importItem(graph, it));
+        }
+        node.addList(p, list);
+      } else {
+        var target = this.importItem(graph, item);
+        node.addLink(p, target.id);
+      }
+    }
+
+  };
+
+
+  function toGraph(data, mappings) {
+    var graph = new Graph(mappings);
+    graph.importJSON(data);
     return graph;
   }
 
 
   function ns(iri) {
-    var resolver = function (term) {
+    var combine = function (term) {
       return iri + term;
     }
     for (var l=arguments, it=null, i=1; it=l[i++];) {
       // some function properties, like 'name' are read-only!
-      var key = (resolver[it] !== undefined)? it + '_' : it;
-      resolver[key] = iri + it;
+      var key = (combine[it] !== undefined)? it + '_' : it;
+      combine[key] = iri + it;
     }
-    return resolver;
+    return combine;
   }
 
 
@@ -316,6 +341,7 @@
   exports.Graph = Graph;
   exports.Node = Node;
   exports.Literal = Literal;
+  exports.List = List;
   exports.ns = ns;
 
 })(typeof exports !== 'undefined'? exports : RDF = {});

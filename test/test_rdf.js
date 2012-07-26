@@ -45,3 +45,6 @@ graph.all().forEach(function (node) {
 
 // walk triples...
 
+console.log("\n## Serializing ##")
+console.log(JSON.stringify(graph, null, 2))
+
