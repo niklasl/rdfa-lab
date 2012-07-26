@@ -1,7 +1,7 @@
 (function (exports) {
 
   if (typeof jsonld === 'undefined' && typeof require === 'function') {
-    var jsonld = require('jsonld');
+    jsonld = require('./jsonld-core');
   }
 
   var CONTEXT = '@context';
@@ -11,17 +11,31 @@
   var GRAPH = "@graph";
   var REV = "@rev";
 
-  var compactSync = exports.compactSync = function (source, context) {
-    // TODO: make async or promote this version
-    var result, error;
-    jsonld.compact(source, context, function (err, out) {
-      result = out, error = err;
-    });
-    while (result === undefined && error === undefined) { ; }
-    return {result: result, error: error};
+  var compact = exports.compact = addSyncSupport(jsonld.compact);
+  var expand = exports.expand = addSyncSupport(jsonld.expand);
+
+  function addSyncSupport(jsonldFunc) {
+    return function () {
+      var useCallback = arguments.length > 3 || arguments.length > 2 &&
+                        typeof arguments[2] === 'function';
+      if (useCallback) {
+        jsonldFunc.apply(arguments);
+      } else {
+        // TODO: brute hack pending resolution of json-ld issue #147
+        // (Add synchronous methods to the API)
+        var input = arguments[0], context = arguments[1];
+        jsonldFunc(input, context, function (err, out) {
+          result = out, error = err;
+        });
+        while (result === undefined && error === undefined) { ; }
+        if (error) { throw error; }
+        return result;
+      }
+    };
   }
 
   var connect = exports.connect = function (source, context) {
+    // TODO: if (context === undefined) ...
     return new Connector(context).connect(source);
   }
 
@@ -60,9 +74,7 @@
   Connector.prototype = {
 
     connect: function (source) {
-      var data = compactSync(source, this.regularCtx);
-      if (data.error) { throw data.error; }
-      var result = data.result;
+      var result = compact(source, this.regularCtx);
 
       var resources = result[GRAPH] || [result];
       if (this.idMapKey) {
