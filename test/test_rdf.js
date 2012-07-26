@@ -24,13 +24,14 @@ var graph = RDF.toGraph(source, prefixes)
 
 console.log("\n## API usage ##")
 //graph.get('rdfs:Class').getAll('^rdf:type').forEach(function (cls) {
-graph.allByType('rdfs:Class').forEach(function (cls) {
+graph.findByType('rdfs:Class').forEach(function (cls) {
   console.log("class: " + cls)
   console.log("  label: " + cls.get('http://www.w3.org/2000/01/rdf-schema#label'))
   cls.getAll('rdfs:subClassOf').forEach(function (sup) {
     console.log("  subClassOf: " + sup.get('rdfs:label'))
   })
-  var subclasses = cls.getAll('^rdfs:subClassOf').map(
+  // cls.getAll('^rdfs:subClassOf') // sparql 1.1. property path for reverse
+  var subclasses = cls.getAllReverse('rdfs:subClassOf').map(
     function (it) { return it.get('rdfs:label') })
   if (subclasses.length)
     console.log("  subclasses: " + subclasses.join(", "))

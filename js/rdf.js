@@ -16,6 +16,8 @@
   function Graph(mappings) {
     this.resolver = new Resolver(mappings);
     this.idMap = {};
+    this.bnodePrefix = "_:gen-" + (new Date().getTime()).toString(16) + "-";
+    this.bnodeCounter = 0;
   }
   Graph.prototype = {
 
@@ -31,7 +33,7 @@
       return result;
     },
 
-    allByType: function (/*types...*/) {
+    findByType: function (/*types...*/) {
       var result = [];
       for (var cls=null, i=0; cls=arguments[i++];) {
         result = result.concat(this.get(cls).revMap[RDF_TYPE])
@@ -54,14 +56,22 @@
           this.addObject(node, p, o);
         }
       }
+      return node;
     },
 
     toNode: function (id) {
+      if (!id) {
+        id = this.nextBNodeID();
+      }
       var node = this.idMap[id];
       if (node === undefined) {
         node = this.idMap[id] = new Node(id, this);
       }
       return node;
+    },
+
+    nextBNodeID: function () {
+      return this.bnodePrefix + this.bnodeCounter++;
     },
 
     addObject: function (node, p, o) {
@@ -71,14 +81,18 @@
           o = {"@id": o};
         }
       }
-      if (o[keys.ID]) {
-        node.addLink(p, o[keys.ID]);
-        this.importItem(o);
-      } else if (o[keys.LIST]) {
-        // TODO: List
-        node.add(p, toList(o[keys.LIST]));
-      } else {
+      if (o[keys.VALUE]) {
         node.addValue(p, o[keys.VALUE], o[keys.LANG], o[keys.TYPE]);
+      } else if (o[keys.LIST]) {
+        // TODO: new List
+        var items = o[keys.LIST], list = [];
+        for (var it=null, i=0; it=items[i++];) {
+          list.push(this.importItem(it));
+        }
+        node.add(p, toList(list));
+      } else {
+        var target = this.importItem(o);
+        node.addLink(p, target.id);
       }
     },
 
@@ -86,7 +100,7 @@
       var l = [];
       for (var p in this.idMap)
         if (this.hasOwnProperty(p))
-          l.push(this.idMap[p]);
+          l.push(this.idMap[p].toJSON());
       return l;
     }
 
@@ -137,14 +151,19 @@
       return o;
     },
 
-    get: function (path) {
-      return this.getAll(path)[0];
+    get: function (path, /*optional*/ params) {
+      return this.getAll(path, params)[0];
     },
 
-    getAll: function (path) {
-      var result;
+    getAll: function (path, /*optional*/ params) {
+      var result,
+        rev = params !== undefined && params.reverse;
       if (path[0] === '^') {
-        var iri = this.graph.resolver.resolve(path.substring(1));
+        path = path.substring(1);
+        rev = true;
+      }
+      if (rev) {
+        var iri = this.graph.resolver.resolve(path);
         result = this.revMap[iri];
       } else {
         var iri = this.graph.resolver.resolve(path);
@@ -154,6 +173,22 @@
         return [];
       else
         return result;
+    },
+
+    getType: function () {
+      return this.get(RDF_TYPE);
+    },
+
+    getTypes: function () {
+      return this.getAll(RDF_TYPE);
+    },
+
+    getReverse: function (term) {
+      return this.get(term, {reverse: true});
+    },
+
+    getAllReverse: function (term) {
+      return this.getAll(term, {reverse: true});
     },
 
     addLink: function (rel, id) {
@@ -204,10 +239,10 @@
   };
 
 
-  function Literal(value, lang, datatype, graph) {
+  function Literal(value, language, datatype, graph) {
     this.value = value;
     this.datatype = datatype;
-    this.lang = lang;
+    this.language = language;
     this.graph = graph;
   }
   Literal.prototype = {
@@ -219,7 +254,7 @@
       var o = {};
       o[keys.VALUE] = this.value;
       if (this.type) o[keys.TYPE] = this.datatype;
-      if (this.lang) o[keys.LANG] = this.lang;
+      if (this.language) o[keys.LANG] = this.language;
       return o;
     },
 
@@ -229,10 +264,12 @@
 
     asDate: function () {}, // TODO
 
+    asXML: function () {}, // TODO
+
     asNative: function () {
-      return this.toDate() ||
-        this.toBoolean() ||
-          this.toNumber() ||
+      return this.asDate() ||
+        this.asBoolean() ||
+          this.asNumber() ||
             this.toString();
     }
 
@@ -262,9 +299,23 @@
   }
 
 
+  function ns(iri) {
+    var resolver = function (term) {
+      return iri + term;
+    }
+    for (var l=arguments, it=null, i=1; it=l[i++];) {
+      // some function properties, like 'name' are read-only!
+      var key = (resolver[it] !== undefined)? it + '_' : it;
+      resolver[key] = iri + it;
+    }
+    return resolver;
+  }
+
+
   exports.toGraph = toGraph;
   exports.Graph = Graph;
   exports.Node = Node;
   exports.Literal = Literal;
+  exports.ns = ns;
 
 })(typeof exports !== 'undefined'? exports : RDF = {});
