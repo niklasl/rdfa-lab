@@ -1,7 +1,7 @@
 (function (exports) {
 
   if (typeof jsonld === 'undefined' && typeof require === 'function') {
-    jsonld = require('./jsonld-core');
+    jsonld = require('./jsonld/core');
   }
 
   var CONTEXT = '@context';
