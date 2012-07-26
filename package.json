@@ -1,0 +1,32 @@
+{
+  "name": "lore",
+  "version": "0.1.0",
+  "description": "An assembly of RDFa/JSON-LD/RDF API tools.",
+  "homepage": "https://github.com/niklasl/rdfa-lab",
+  "author": {
+    "name": "Niklas Lindström",
+    "email": "lindstream@gmail.com",
+    "url": "http://neverspace.net/"
+  },
+  "keywords": ["rdf", "rdfa", "json", "jsonld", "linked-data", "html"],
+  "directories": {
+    "lib": "./js"
+  },
+  "main": "./js/lore",
+  "optionalDependencies": {
+    "jsdom": ">= 0.2.15"
+  },
+  "engines": {
+    "node": "*"
+  },
+  "licenses" : [
+    {
+      "type" : "MIT",
+      "url" : "http://opensource.org/licenses/MIT"
+    },
+    {
+      "type" : "BSD",
+      "url" : "https://github.com/digitalbazaar/jsonld.js/blob/master/LICENSE"
+    }
+  ]
+}
