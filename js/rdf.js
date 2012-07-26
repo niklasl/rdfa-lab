@@ -36,7 +36,7 @@
     findByType: function (/*types...*/) {
       var result = [];
       for (var cls=null, i=0; cls=arguments[i++];) {
-        result = result.concat(this.get(cls).revMap[RDF_TYPE])
+        result = result.concat(this.get(cls).incoming[RDF_TYPE])
       }
       return result;
     },
@@ -135,7 +135,7 @@
     this.id = id;
     this.graph = graph;
     this.properties = {};
-    this.revMap = {};
+    this.incoming = {};
   }
   Node.prototype = {
     constructor: Node,
@@ -164,7 +164,7 @@
       }
       if (rev) {
         var iri = this.graph.resolver.resolve(path);
-        result = this.revMap[iri];
+        result = this.incoming[iri];
       } else {
         var iri = this.graph.resolver.resolve(path);
         result = this.properties[iri];
@@ -195,10 +195,10 @@
       var object = this.graph.toNode(id);
       var rel = this.graph.resolver.resolve(rel);
       this.add(rel, object.toRef());
-      var rev = object.revMap[rel];
+      var rev = object.incoming[rel];
       if (rev === undefined) {
         rev = [];
-        object.revMap[rel] = rev;
+        object.incoming[rel] = rev;
       }
       if (rev[this.id] === undefined) {
         var ref = this.toRef();
