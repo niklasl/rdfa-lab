@@ -2,7 +2,7 @@
 var RDFaJSON;
 
 (function(exports) {
-  var Context, RDFA_IRI, RDF_IRI, XSD_IRI;
+  var Context, RDFA_IRI, RDF_IRI, RDF_XMLLiteral, XSD_IRI, splitCurie;
   exports.extract = function(doc, base) {
     var extract;
     doc || (doc = window.document);
@@ -129,7 +129,7 @@ var RDFaJSON;
           }
         }
         if (!value && !(attrs.rel || attrs.rev || hanging.rel || hanging.rev)) {
-          if (((_ref7 = attrs.datatype) != null ? _ref7.value : void 0) === 'rdf:XMLLiteral') {
+          if (ctxt.expand((_ref7 = attrs.datatype) != null ? _ref7.value : void 0) === RDF_XMLLiteral) {
             value = el.innerHTML;
           } else {
             value = el.textContent;
@@ -293,6 +293,34 @@ var RDFaJSON;
       return key;
     };
 
+    Context.prototype.get = function(key) {
+      return this.rootCtxt[key] || this.localCtxt[key];
+    };
+
+    Context.prototype.expand = function(termOrCurieOrIri) {
+      if (!termOrCurieOrIri) {
+        return null;
+      }
+      if (termOrCurieOrIri.indexOf(':') === -1) {
+        return this.get(termOrCurieOrIri);
+      } else {
+        return this.expandCurieOrIri(termOrCurieOrIri);
+      }
+    };
+
+    Context.prototype.expandCurieOrIri = function(curieOrIri) {
+      var ns, pfx, term, _ref;
+      _ref = splitCurie(curieOrIri), pfx = _ref[0], term = _ref[1];
+      if (term.slice(0, 2) === "//") {
+        return curieOrIri;
+      }
+      ns = get([parts[0]]);
+      if (ns !== void 0) {
+        return ns + parts[1];
+      }
+      return curieOrIri;
+    };
+
     return Context;
 
   })();
@@ -332,6 +360,12 @@ var RDFaJSON;
     }
   };
   RDF_IRI = exports.contexts.html.rdf;
+  RDF_XMLLiteral = RDF_IRI + 'XMLLiteral';
   XSD_IRI = exports.contexts.html.xsd;
-  return RDFA_IRI = exports.contexts.html.rdfa;
+  RDFA_IRI = exports.contexts.html.rdfa;
+  return splitCurie = function(expr) {
+    var i;
+    i = expr.indexOf(':');
+    return [expr.substring(0, i), expr.substring(i + 1)];
+  };
 })(typeof exports !== "undefined" && exports !== null ? exports : RDFaJSON = {});

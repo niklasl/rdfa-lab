@@ -9,20 +9,25 @@
 
 
   # TODO:
-  # - modularize and complete profile support (default context etc.)
-  # - resolve datatype and match IRI for rdf:XMLLiteral
   # - xml:lang, xmlns:*
-  # - more flat (add first occurrence of @id to graph and fill in that)
   # NEXT:
-  # - attach (non-enumerable) function for getSource (for an RDFa:ish API)
-  #   - source as map of property -> subjectElement, objectElement (no hanging for now)
+  # - more flat (add first occurrence of @id to graph and fill in that)
+  # - ensure terms and pfx:es are copied from default ctxt to output
+  # NEXT:
+  # - from element: get(Subject|Types|Properties|Rels|Revs|Link|Value|Lang|Datatype)
   # NEXT:
   # - fix interplay of about, property, rel/rev, typeof
   # - fix hanging rev
   # - if hanging and prop/rel/rev: inject bnode
+  # NEXT:
   # - determine strategy for "pathological" input (e.g. redef. prefixes)
+  # - flags for context generation:
+  #   - as now; expand fully; condense: only terms (track curies, rewrite if safe)
+  # NEXT:
+  # - Use Description access for a live RDFa DOM API
+  #   - from document: getElementsBy(Subject|Type|Property)
+  # - modularize and complete profile support (default context etc.)
   # DEFERRED:
-  # - flag to build context and keep compact or produce expanded json-ld?
   # - for compaction with custom context: feed into an JSON-LD API impl.
   class exports.Extract
 
@@ -117,7 +122,7 @@
             else
               'xsd:date'
         if not value and not (attrs.rel or attrs.rev or hanging.rel or hanging.rev)
-          if attrs.datatype?.value == 'rdf:XMLLiteral'
+          if ctxt.expand(attrs.datatype?.value) == RDF_XMLLiteral
             value = el.innerHTML
           else
             value = el.textContent
@@ -233,6 +238,26 @@
           return null
       return key
 
+    get: (key) ->
+      @rootCtxt[key] or @localCtxt[key]
+
+    expand: (termOrCurieOrIri) ->
+      return null unless termOrCurieOrIri
+      if termOrCurieOrIri.indexOf(':') is -1
+        @get(termOrCurieOrIri)
+      else
+        @expandCurieOrIri(termOrCurieOrIri)
+
+    expandCurieOrIri: (curieOrIri) ->
+      [pfx, term] = splitCurie(curieOrIri)
+      if term.slice(0, 2) is "//"
+        return curieOrIri
+      ns = get([parts[0]])
+      if ns isnt undefined
+        return ns + parts[1]
+      return curieOrIri
+
+
   exports.contexts =
     html: {
       "grddl": "http://www.w3.org/2003/g/data-view#",
@@ -269,7 +294,13 @@
     }
 
   RDF_IRI = exports.contexts.html.rdf
+  RDF_XMLLiteral = RDF_IRI + 'XMLLiteral'
+
   XSD_IRI = exports.contexts.html.xsd
   RDFA_IRI = exports.contexts.html.rdfa
+
+  splitCurie = (expr) ->
+    i = expr.indexOf(':')
+    return [expr.substring(0, i), expr.substring(i + 1)]
 
 )(exports ? RDFaJSON = {})
