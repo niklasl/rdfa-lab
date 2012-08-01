@@ -9,11 +9,10 @@
 
 
   # TODO:
-  # - xml:lang, xmlns:*
-  # NEXT:
   # - more flat (add first occurrence of @id to graph and fill in that)
   # - ensure terms and pfx:es are copied from default ctxt to output
   # NEXT:
+  # - xml:lang, xmlns:*
   # - from element: get(Subject|Types|Properties|Rels|Revs|Link|Value|Lang|Datatype)
   # NEXT:
   # - fix interplay of about, property, rel/rev, typeof
@@ -139,7 +138,7 @@
             ctxt.update(type, vocab + type)
         (next or current)['@type'] = types
 
-      inlist = (attrs.inlist != undefined) or (hanging.rel and hanging.inlist)
+      inlist = (attrs.inlist isnt undefined) or (hanging.rel and hanging.inlist)
 
       if value
         if predicate
@@ -192,7 +191,7 @@
         if (sub for sub in el.childNodes when sub.nodeType is 1).length
           @graph.push(next)
 
-      if not next #or next['@id'] == current['@id'] # don't detach as new?
+      if not next or next['@id'] == current['@id'] # don't detach as new...
         next = current
 
       return [next, vocab, hanging]
@@ -252,9 +251,9 @@
       [pfx, term] = splitCurie(curieOrIri)
       if term.slice(0, 2) is "//"
         return curieOrIri
-      ns = get([parts[0]])
+      ns = @get(pfx)
       if ns isnt undefined
-        return ns + parts[1]
+        return ns + term
       return curieOrIri
 
 

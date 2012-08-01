@@ -227,7 +227,7 @@ var RDFaJSON;
           this.graph.push(next);
         }
       }
-      if (!next) {
+      if (!next || next['@id'] === current['@id']) {
         next = current;
       }
       return [next, vocab, hanging];
@@ -314,9 +314,9 @@ var RDFaJSON;
       if (term.slice(0, 2) === "//") {
         return curieOrIri;
       }
-      ns = get([parts[0]]);
+      ns = this.get(pfx);
       if (ns !== void 0) {
-        return ns + parts[1];
+        return ns + term;
       }
       return curieOrIri;
     };
