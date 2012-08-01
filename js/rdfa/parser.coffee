@@ -1,7 +1,8 @@
 ((exports) ->
 
   RDF_IRI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-  RDF_XMLLiteral = RDF_IRI + 'XMLLiteral'
+  RDF_XML_LITERAL = RDF_IRI + 'XMLLiteral'
+  RDFA_USES_VOCAB = "http://www.w3.org/ns/rdfa#usesVocabulary"
 
 
   extract = (doc, base, profile='html') ->
@@ -39,33 +40,36 @@
       current = state.current
       nextObj = current
 
+      if desc.usesVocab
+        baseObj = getOrCreate(res, state.base)
+        addPropToObj(baseObj, RDFA_USES_VOCAB, desc.usesVocab)
+
       s = desc.getSubject()
       if s
-        current = res.all[s]
-        unless current
-          current = res.all[s] = {"@id": s}
+        current = getOrCreate(res, s)
 
       o = desc.getReference()
       if o
-        nextObj = res.all[o]
-        unless nextObj
-          nextObj = res.all[o] = {"@id": o}
+        nextObj = getOrCreate(res, o)
 
+      types = desc.types
+      if types
+        typed = if desc.about then current else nextObj
+        for type in types
+          addPropToObj(typed, "@type", type)
+
+      if o
         for link in desc.getLinks()
-          refs = current[link]
-          unless refs
-            refs = current[link] = []
-          refs.push({"@id": o})
+          addPropToObj(current, link, {"@id": o})
 
-      value = desc.getValue()
+      value = desc.getLiteral()
       if value
         for prop in desc.getValueProperties()
-          values = current[prop]
-          unless values
-            values = current[prop] = []
-          values.push(value)
+          addPropToObj(current, prop, value)
 
-      subState = desc.getChildState()
+      subState = desc.state
+      #nextListMap
+      #nextHangSubject, nextHangRel, nextHangRev
       subState.current = nextObj
       return subState
 
@@ -85,35 +89,93 @@
       #{'@context': state.result.context, '@graph': items}
 
 
+  getOrCreate = (res, id) ->
+      obj = res.all[id]
+      unless obj
+        obj = res.all[id] = {"@id": id}
+      obj
+
+  addPropToObj = (obj, prop, value) ->
+    values = obj[prop]
+    unless values
+      values = obj[prop] = []
+    values.push(value)
+
+
   class State
-    constructor: (base=null, @profile, @resolveURI) ->
-      @mappings = {base: base, lang: null, vocab: null, prefixes: {}}
+    constructor: (@base, @profile, resolveURI) ->
+      @mapper = new Mapper(null, contexts[@profile])
+      @lang = null
       @lists = {}
       @hanging = {rels: [], revs: [], lists: []}
       @result = null
       @current = null
+      @resolveURI = resolveURI
 
-    newLocal: (base, lang, vocab, prefixes) ->
+    createInherited: (base, lang, vocab, prefixes) ->
       # TODO: new State with updated members
-      ctor = () ->
-      ctor.prototype = this
-      return new ctor
+      subState = inherit(this)
+      subState.lang = lang or @lang
+      subState.mapper = @mapper.createInherited(vocab, prefixes)
+      return subState
+
+    expandTermOrCurieOrIRI: (expr) ->
+      @mapper.expandTermOrCurieOrIRI(expr)
+
+    expandCurieOrIRI: (expr) ->
+      @mapper.expandCurieOrIRI(expr)
+
+    expandAndResolve: (curieOrIri) ->
+      @resolveURI(@expandCurieOrIRI(curieOrIri))
 
 
-  class Mappings
+  class Mapper
+    constructor: (@vocab=null, @map={}) ->
+
+    createInherited: (vocab, prefixes) ->
+      vocab ?= @vocab
+      subMap = inherit(@map)
+      for pfx, iri of prefixes
+        subMap[pfx] = iri
+      return new Mapper(vocab, subMap)
+
+    expandTermOrCurieOrIRI: (expr) ->
+      iri = @map[expr]
+      if iri
+        return iri
+      else if expr.indexOf(":") is -1
+        if @vocab
+          return @vocab + expr
+        else
+          return null
+      else
+        return @expandCurieOrIRI(expr)
+
+    expandCurieOrIRI: (expr) ->
+      i = expr.indexOf(':')
+      if i is -1
+        return expr
+      pfx = expr.substring(0, i)
+      term = expr.substring(i + 1)
+      if term.slice(0, 2) is "//"
+        return expr
+      ns = @map[pfx]
+      if ns
+        return ns + term
+      return expr
 
 
   ##
   # A representation of the interpreted description formed by the logical
   # attributes of an element. Use this to produce triples.
   class Description
-    constructor: (el, parentState=null) ->
-      parentState = @computeParentState(el, parentState)
+    constructor: (el, parentState) ->
       #@data =
       data = new ElementData(el, parentState)
+      @usesVocab = data.getVocab()
       @state = data.state
       @tagName = data.tagName
-      #@mappings = data.mappings
+      #@mapper = data.mapper
       @about = data.getAbout()
       @resource = data.getResource()
       @types = data.getTypes()
@@ -121,29 +183,9 @@
       @rels = data.getRels()
       @revs = data.getRevs()
       if @properties
-        @datatype = data.getDatatype()
-        if @datatype is RDF_XMLLiteral
-          @xml = data.getXML()
-        else
-          @content = data.getContent()
+        @literal = data.getLiteral()
       if data.isInlist()
         @inlist = true
-
-    computeParentState: (el, parentState) ->
-      if typeof parentState is 'string'
-        base = parentState
-        parentState = null
-      if parentState
-        return parentState
-      if not el.parentNode or el.parentNode is el
-        throw "NotImplemented: computeParentState for non-root not supported"
-      return new State(base)
-
-    getChildState: ->
-      @state
-      #nextSubject
-      #nextListMap
-      #nextHangSubject, nextHangRel, nextHangRev
 
     getErrors: ->
       @data.errors
@@ -162,17 +204,10 @@
       else if @typeof
        return @newBNode()
 
-    getValue: ->
-      if @content
-        if @datatype
-          return {"@value": @content, "@datatype": @datatype}
-        else if @lang
-          # TODO: inherited (in compact: if diff. from top-level lang)
-          return {"@value": @content, "@language": @lang}
-        else
-          return @content
-      else# if @xml
-        return {"@value": @xml, "@datatype": @datatype}
+    getLiteral: ->
+      lit = @literal
+      return null unless lit
+      {"@value": lit.value, "@language": lit.lang, "@datatype": lit.datatype}
 
     getLinks: ->
       if @rels
@@ -207,7 +242,7 @@
       @attrs = @el.attributes
       @tagName = @el.nodeName.toLowerCase()
       @errors = []
-      @state = parentState.newLocal(
+      @state = parentState.createInherited(
         @getBase(), @getLang(), @getVocab(), @getPrefixes())
 
     getBase: ->
@@ -232,27 +267,54 @@
 
     getAbout: ->
       if @attrs.about? #and not parent
-        next = @state.resolveURI(@attrs.about.value)
+        next = @state.expandAndResolve(@attrs.about.value)
 
     getResource: ->
       if @attrs.resource?
-        next = @state.resolveURI(@attrs.resource.value)
+        next = @state.expandAndResolve(@attrs.resource.value)
       else if @attrs.href?
         next = @el.href
       else if @attrs.src?
         next = @state.resolveURI(@attrs.src.value)
 
     getTypes: ->
-      @attrs.typeof?.value.split(/\s+/)
+      @expandAll @attrs.typeof?.value.split(/\s+/)
 
     getProperties: ->
-      predicate = @attrs.property?.value.split(/\s+/)
+      @expandAll @attrs.property?.value.split(/\s+/)
 
     getRels: ->
-      @attrs.rel?.value.split(/\s+/)
+      @expandAll @attrs.rel?.value.split(/\s+/)
 
     getRevs: ->
-      @attrs.rev?.value.split(/\s+/)
+      @expandAll @attrs.rev?.value.split(/\s+/)
+
+    expandAll: (expressions) ->
+      return null unless expressions
+      result = []
+      for expr in expressions
+        iri = @state.expandTermOrCurieOrIRI(expr)
+        if iri
+          result.push(iri)
+      result
+
+    getLiteral: ->
+      datatype = @getDatatype()
+      lang = @state.lang
+      if datatype is RDF_XML_LITERAL
+        xml = @getXML()
+      else
+        content = @getContent()
+      if content
+        if datatype
+          return {value: content, datatype: datatype}
+        else if lang
+          # TODO: inherited (in compact: if diff. from top-level lang)
+          return {value: content, lang: lang}
+        else
+          return content
+      else# if xml
+        return {value: xml, datatype: datatype}
 
     getContent: ->
       if @attrs.content?
@@ -314,6 +376,12 @@
       "license": "http://www.w3.org/1999/xhtml/vocab#license",
       "role": "http://www.w3.org/1999/xhtml/vocab#role"
     }
+
+
+  inherit = (obj) ->
+    ctor = () ->
+    ctor.prototype = obj
+    return new ctor
 
 
   exports.extract = extract
