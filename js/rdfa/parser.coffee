@@ -4,13 +4,8 @@
   RDF_XMLLiteral = RDF_IRI + 'XMLLiteral'
 
 
-  extract = (doc, base) ->
-    resolver = doc.createElement('a')
-    resolveURI = (ref) ->
-      resolver.href = ref
-      return resolver.href
-    state = new State(base, resolveURI)
-    builder.init(state)
+  extract = (doc, base, profile='html') ->
+    state = builder.init(doc, base, profile)
     walk(doc.documentElement, state)
     return builder.complete(state)
 
@@ -24,39 +19,88 @@
 
   builder =
 
-    init: (state) ->
-      state.result = []
-      #top = {}
-      #result.current = top
-      #result.graph = [top]
-      #result.context = {}
+    init: (doc, base, profile) ->
+      resolver = doc.createElement('a')
+      resolveURI = (ref) ->
+        resolver.href = ref
+        return resolver.href
+      state = new State(base, profile, resolveURI)
+      docObj = {"@id": base}
+      all = {}
+      all[base] = docObj
+      #context = {}
+      state.current = docObj
+      state.result = {all: all}
+      return state
 
     visit: (el, state) ->
       desc = new Description(el, state)
-      state.result.push(desc)
+      res = state.result
+      current = state.current
+      nextObj = current
+
+      s = desc.getSubject()
+      if s
+        current = res.all[s]
+        unless current
+          current = res.all[s] = {"@id": s}
+
+      o = desc.getReference()
+      if o
+        nextObj = res.all[o]
+        unless nextObj
+          nextObj = res.all[o] = {"@id": o}
+
+        for link in desc.getLinks()
+          refs = current[link]
+          unless refs
+            refs = current[link] = []
+          refs.push({"@id": o})
+
+      value = desc.getValue()
+      if value
+        for prop in desc.getValueProperties()
+          values = current[prop]
+          unless values
+            values = current[prop] = []
+          values.push(value)
+
       subState = desc.getChildState()
-      subState.result = desc.items = []
-      delete desc.state
+      subState.current = nextObj
       return subState
 
     complete: (state) ->
-      state.result
-      #result = state.result
-      #{'@context': result.context, '@graph': result.graph}
+      items = []
+      for s, obj of state.result.all
+        add = true
+        if obj["@id"]
+          add = false
+          for key of obj
+            if key != "@id"
+              add = true
+              break
+        if add
+          items.push(obj)
+      items
+      #{'@context': state.result.context, '@graph': items}
 
 
   class State
-    constructor: (base=null, @resolveURI) ->
+    constructor: (base=null, @profile, @resolveURI) ->
       @mappings = {base: base, lang: null, vocab: null, prefixes: {}}
       @lists = {}
       @hanging = {rels: [], revs: [], lists: []}
       @result = null
+      @current = null
 
     newLocal: (base, lang, vocab, prefixes) ->
       # TODO: new State with updated members
       ctor = () ->
       ctor.prototype = this
       return new ctor
+
+
+  class Mappings
 
 
   ##
@@ -105,15 +149,44 @@
       @data.errors
 
     getSubject: ->
+      if @about
+        return @about
+      else if @resource and not (@rels or @revs) # or @property and @typeof
+        return @resource
+      else if @typeof
+        return @newBNode()
 
     getReference: ->
-      #resource else if typeof then bnode
+      if @resource
+        return @resource
+      else if @typeof
+       return @newBNode()
 
     getValue: ->
+      if @content
+        if @datatype
+          return {"@value": @content, "@datatype": @datatype}
+        else if @lang
+          # TODO: inherited (in compact: if diff. from top-level lang)
+          return {"@value": @content, "@language": @lang}
+        else
+          return @content
+      else# if @xml
+        return {"@value": @xml, "@datatype": @datatype}
 
     getLinks: ->
+      if @rels
+        return @rels
+      else if @properties # TODO: and not content.. and getReference()
+        return @properties
+      else
+        return []
 
     getValueProperties: ->
+      if @properties and (not @resource or @types)
+        return @properties
+      else
+        return []
 
     getListLinks: ->
 
@@ -121,10 +194,13 @@
 
     getRevLinks: ->
 
+    newBNode: ->
+      "_:" # TODO: gen named or marker for proper blank?
+
 
   ##
   # A representation of the logical data expressed by an element. This takes
-  # context mappings into account, but does not interpret the # attribute
+  # context mappings into account, but does not interpret the attribute
   # interplay and generation of triples.
   class ElementData
     constructor: (@el, parentState) ->
@@ -156,15 +232,15 @@
 
     getAbout: ->
       if @attrs.about? #and not parent
-        next = {'@id': @state.resolveURI(@attrs.about.value)}
+        next = @state.resolveURI(@attrs.about.value)
 
     getResource: ->
       if @attrs.resource?
-        next = {'@id': @state.resolveURI(@attrs.resource.value)}
+        next = @state.resolveURI(@attrs.resource.value)
       else if @attrs.href?
-        next = {'@id': @el.href}
+        next = @el.href
       else if @attrs.src?
-        next = {'@id': @state.resolveURI(@attrs.src.value)}
+        next = @state.resolveURI(@attrs.src.value)
 
     getTypes: ->
       @attrs.typeof?.value.split(/\s+/)
@@ -181,7 +257,7 @@
     getContent: ->
       if @attrs.content?
         return @attrs.content.value
-      else if @profile is 'html' and @tagName is 'time'
+      else if @state.profile is 'html' and @tagName is 'time'
         if @attrs.datetime?
           return @attrs.datetime.value
       return @el.textContent
@@ -192,7 +268,8 @@
     getDatatype: ->
       if @attrs.datatype?
         return @attrs.datatype.value
-      else if @profile is 'html' and @tagName is 'time'
+      else if @state.profile is 'html' and @tagName is 'time'
+        value = @getContent()
         if value.indexOf('T') > -1
           return 'xsd:dateTime'
         else
