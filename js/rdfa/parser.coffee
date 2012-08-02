@@ -18,13 +18,18 @@
         walk(child, subState or state)
 
 
+  nextBNode = null
+
   builder =
 
     init: (doc, base, profile) ->
+      nextBNode = bnodeCounter()
       resolver = doc.createElement('a')
       resolveURI = (ref) ->
         resolver.href = ref
         return resolver.href
+      if doc.getElementsByTagName('base').length
+        base = resolveURI('')
       state = new State(base, profile, resolveURI)
       docObj = {"@id": base}
       all = {}
@@ -38,11 +43,13 @@
       desc = new Description(el, state)
       res = state.result
       current = state.current
-      nextObj = current
+      nextObj = null
 
       if desc.usesVocab
         baseObj = getOrCreate(res, state.base)
         addPropToObj(baseObj, RDFA_USES_VOCAB, desc.usesVocab)
+
+      types = desc.types
 
       s = desc.getSubject()
       if s
@@ -50,9 +57,9 @@
 
       o = desc.getReference()
       if o
-        nextObj = getOrCreate(res, o)
+        unless desc.propertiesAsLinks and not types
+          nextObj = getOrCreate(res, o)
 
-      types = desc.types
       if types
         typed = if desc.about then current else nextObj
         for type in types
@@ -70,7 +77,7 @@
       subState = desc.state
       #nextListMap
       #nextHangSubject, nextHangRel, nextHangRev
-      subState.current = nextObj
+      subState.current = nextObj or current
       return subState
 
     complete: (state) ->
@@ -113,9 +120,8 @@
       @resolveURI = resolveURI
 
     createInherited: (base, lang, vocab, prefixes) ->
-      # TODO: new State with updated members
       subState = inherit(this)
-      subState.lang = lang or @lang
+      subState.lang = if lang? then lang else @lang
       subState.mapper = @mapper.createInherited(vocab, prefixes)
       return subState
 
@@ -157,6 +163,8 @@
         return expr
       pfx = expr.substring(0, i)
       term = expr.substring(i + 1)
+      if pfx is '_'
+        return expr
       if term.slice(0, 2) is "//"
         return expr
       ns = @map[pfx]
@@ -182,7 +190,9 @@
       @properties = data.getProperties()
       @rels = data.getRels()
       @revs = data.getRevs()
-      if @properties
+      @propertiesAsLinks = !!(@properties and (not (@rels or @revs)) and (@resource or @types))
+        # TODO: .. and not content attr and getReference()
+      if @properties and not @propertiesAsLinks
         @literal = data.getLiteral()
       if data.isInlist()
         @inlist = true
@@ -193,32 +203,35 @@
     getSubject: ->
       if @about
         return @about
-      else if @resource and not (@rels or @revs) # or @property and @typeof
+      else if @resource and not ((@rels or @revs) or @propertiesAsLinks)
         return @resource
-      else if @typeof
+      else if @types and not (@properties or @rels or @revs)
         return @newBNode()
 
     getReference: ->
       if @resource
         return @resource
-      else if @typeof
-       return @newBNode()
+      else if @types and (@rels or @properties) # and not content attr
+        return @newBNode()
 
     getLiteral: ->
       lit = @literal
       return null unless lit
-      {"@value": lit.value, "@language": lit.lang, "@datatype": lit.datatype}
+      unless lit.lang or lit.datatype
+        lit.value
+      else
+        {"@value": lit.value, "@language": lit.lang, "@datatype": lit.datatype}
 
     getLinks: ->
       if @rels
         return @rels
-      else if @properties # TODO: and not content.. and getReference()
+      else if @propertiesAsLinks
         return @properties
       else
         return []
 
     getValueProperties: ->
-      if @properties and (not @resource or @types)
+      if @properties and not @propertiesAsLinks
         return @properties
       else
         return []
@@ -230,7 +243,7 @@
     getRevLinks: ->
 
     newBNode: ->
-      "_:" # TODO: gen named or marker for proper blank?
+      nextBNode() # TODO: marker for proper blank?
 
 
   ##
@@ -271,14 +284,18 @@
 
     getResource: ->
       if @attrs.resource?
-        next = @state.expandAndResolve(@attrs.resource.value)
+        return @state.expandAndResolve(@attrs.resource.value)
       else if @attrs.href?
-        next = @el.href
+        return @state.resolveURI(@attrs.href.value)
       else if @attrs.src?
-        next = @state.resolveURI(@attrs.src.value)
+        return @state.resolveURI(@attrs.src.value)
 
     getTypes: ->
-      @expandAll @attrs.typeof?.value.split(/\s+/)
+      # TODO: in jsdom, typeof is expanded to typeof="typeof"
+      values = @attrs.typeof?.value.split(/\s+/)
+      if values
+        values = (v for v in values when v isnt 'typeof')
+      @expandAll values
 
     getProperties: ->
       @expandAll @attrs.property?.value.split(/\s+/)
@@ -312,7 +329,7 @@
           # TODO: inherited (in compact: if diff. from top-level lang)
           return {value: content, lang: lang}
         else
-          return content
+          return {value: content}
       else# if xml
         return {value: xml, datatype: datatype}
 
@@ -376,6 +393,12 @@
       "license": "http://www.w3.org/1999/xhtml/vocab#license",
       "role": "http://www.w3.org/1999/xhtml/vocab#role"
     }
+
+
+  bnodeCounter = ->
+    prefix = "_:gen-#{(new Date().getTime()).toString(16)}-"
+    count = 0
+    return -> prefix + count++
 
 
   inherit = (obj) ->
