@@ -68,6 +68,11 @@
       if o
         for link in desc.getLinks()
           addPropToObj(current, link, {"@id": o})
+        revs = desc.getRevLinks()
+        if revs.length
+          subjRef = {"@id": s or current["@id"]}
+          for rev in revs
+            addPropToObj(nextObj or getOrCreate(res, o), rev, subjRef)
 
       value = desc.getLiteral()
       if value
@@ -241,6 +246,7 @@
     getListValueProperties: ->
 
     getRevLinks: ->
+      if @revs then @revs else []
 
     newBNode: ->
       nextBNode() # TODO: marker for proper blank?
