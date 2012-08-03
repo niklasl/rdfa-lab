@@ -65,19 +65,33 @@
         for type in types
           addPropToObj(typed, "@type", type)
 
+      # TODO:
+      #if hanging.*
+      #  if no s or o but predicates
+      #    hangingSubject = hanging.subject
+      #  else if s or o
+      #    attach to state.current: hangingSubject or if s then current else nextObj
+      #    if hanging.subject used current = hangingSubject
+      #    nextHanging = {...}
+
+      if desc.inlist
+        addToObj = addToPropListToObj
+      else
+        addToObj = addPropToObj
+
       if o
         for link in desc.getLinks()
-          addPropToObj(current, link, {"@id": o})
+          addToObj(current, link, {"@id": o})
         revs = desc.getRevLinks()
         if revs.length
           subjRef = {"@id": s or current["@id"]}
           for rev in revs
-            addPropToObj(nextObj or getOrCreate(res, o), rev, subjRef)
+            addToObj(nextObj or getOrCreate(res, o), rev, subjRef)
 
       value = desc.getLiteral()
       if value
         for prop in desc.getValueProperties()
-          addPropToObj(current, prop, value)
+          addToObj(current, prop, value)
 
       subState = desc.state
       #nextListMap
@@ -111,6 +125,23 @@
     values = obj[prop]
     unless values
       values = obj[prop] = []
+    values.push(value)
+
+  addToPropListToObj = (obj, prop, value) ->
+    values = obj[prop]
+    # TODO: list in Array or direct object (latter prevents sets of mixed refs+lists)
+    if values instanceof Array
+      if values[0]['@list']
+        values = values[0]['@list']
+      else
+        l = []
+        values.unshift({'@list': l})
+        values = l
+    else if values
+      values = values['@list']
+    else
+      values = []
+      obj[prop] = {"@list": values}
     values.push(value)
 
 
@@ -199,8 +230,7 @@
         # TODO: .. and not content attr and getReference()
       if @properties and not @propertiesAsLinks
         @literal = data.getLiteral()
-      if data.isInlist()
-        @inlist = true
+      @inlist = data.isInlist()
 
     getErrors: ->
       @data.errors
@@ -240,10 +270,6 @@
         return @properties
       else
         return []
-
-    getListLinks: ->
-
-    getListValueProperties: ->
 
     getRevLinks: ->
       if @revs then @revs else []
