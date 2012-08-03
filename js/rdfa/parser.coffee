@@ -65,28 +65,44 @@
         for type in types
           addPropToObj(typed, "@type", type)
 
-      # TODO:
-      #if hanging.*
-      #  if no s or o but predicates
-      #    hangingSubject = hanging.subject
-      #  else if s or o
-      #    attach to state.current: hangingSubject or if s then current else nextObj
-      #    if hanging.subject used current = hangingSubject
-      #    nextHanging = {...}
+      rels = desc.getLinks()
+      revs = desc.getRevLinks()
+      inlist = desc.inlist
 
-      if desc.inlist
+      hanging = state.hanging
+      if hanging.present
+        # TODO: this just supports connecting resource; see commented below
+        if o
+          s = null
+          current = state.current
+          rels = hanging.rels
+          revs = hanging.revs
+          inlist = hanging.inlist
+          hanging = {present: false}
+        #if not (s or o) and (desc.rels or desc.revs or desc.properties)
+        #  hangingSubject = hanging.subject
+        #  nextHanging
+        #else if s or o
+        #  attach to state.current: hangingSubject or if s then current else nextObj
+        #  if hanging.subject used current = hangingSubject
+        #  nextHanging
+
+      if inlist
         addToObj = addToPropListToObj
       else
         addToObj = addPropToObj
 
       if o
-        for link in desc.getLinks()
+        for link in rels
           addToObj(current, link, {"@id": o})
-        revs = desc.getRevLinks()
         if revs.length
           subjRef = {"@id": s or current["@id"]}
           for rev in revs
             addToObj(nextObj or getOrCreate(res, o), rev, subjRef)
+      else
+        present = !!(rels.length or revs.length)
+        hanging = {present: present, rels: rels, revs: revs, inlist: inlist}
+        console.log
 
       value = desc.getLiteral()
       if value
@@ -94,8 +110,7 @@
           addToObj(current, prop, value)
 
       subState = desc.state
-      #nextListMap
-      #nextHangSubject, nextHangRel, nextHangRev
+      subState.hanging = hanging
       subState.current = nextObj or current
       return subState
 
@@ -150,7 +165,7 @@
       @mapper = new Mapper(null, contexts[@profile])
       @lang = null
       @lists = {}
-      @hanging = {rels: [], revs: [], lists: []}
+      @hanging = {present: false, rels: null, revs: null, lists: null}
       @result = null
       @current = null
       @resolveURI = resolveURI
