@@ -61,7 +61,7 @@
           nextObj = getOrCreate(res, o)
 
       if types
-        typed = if desc.about then current else nextObj
+        typed = if desc.about or not nextObj then current else nextObj
         for type in types
           addPropToObj(typed, "@type", type)
 
@@ -102,7 +102,6 @@
       else
         present = !!(rels.length or revs.length)
         hanging = {present: present, rels: rels, revs: revs, inlist: inlist}
-        console.log
 
       value = desc.getLiteral()
       if value
@@ -140,6 +139,8 @@
     values = obj[prop]
     unless values
       values = obj[prop] = []
+    else unless values.push
+      values = obj[prop] = [values]
     values.push(value)
 
   addToPropListToObj = (obj, prop, value) ->
@@ -270,7 +271,7 @@
       unless lit.lang or lit.datatype
         lit.value
       else
-        {"@value": lit.value, "@language": lit.lang, "@datatype": lit.datatype}
+        {"@value": lit.value, "@language": lit.lang, "@type": lit.datatype}
 
     getLinks: ->
       if @rels
@@ -309,20 +310,27 @@
       null # xml:base if XML-based profile
 
     getLang: ->
-      @attrs.lang?.value
+      @attrs['xml:lang']?.value or @attrs.lang?.value
 
     getVocab: ->
       @attrs.vocab?.value
 
     getPrefixes: ->
+      prefixes = @getNamespaces()
       val = @attrs.prefix?.value
-      return null unless val
+      return prefixes unless val
       pfxs = val.replace(/^\s+|\s+$/g, "").split(/:?\s+/)
-      prefixes = {}
       for i in [0...pfxs.length] by 2
         pfx = pfxs[i]
         ns = pfxs[i+1]
         prefixes[pfx] = ns
+      prefixes
+
+    getNamespaces: ->
+      prefixes = {}
+      for attr in @attrs
+        if attr.name.match(/^xmlns:/)
+          prefixes[attr.name.substring(6)] = attr.value
       prefixes
 
     getAbout: ->
@@ -393,13 +401,18 @@
 
     getDatatype: ->
       if @attrs.datatype?
-        return @attrs.datatype.value
+        return @state.expandTermOrCurieOrIRI(@attrs.datatype.value)
       else if @state.profile is 'html' and @tagName is 'time'
         value = @getContent()
+        # TODO: use full iri unless compact..
+        if value[0] is 'P'
+          return @state.expandTermOrCurieOrIRI('xsd:duration')
         if value.indexOf('T') > -1
-          return 'xsd:dateTime'
+          return @state.expandTermOrCurieOrIRI('xsd:dateTime')
+        else if value.indexOf(':') > -1
+          return @state.expandTermOrCurieOrIRI('xsd:time')
         else
-          return 'xsd:date'
+          return @state.expandTermOrCurieOrIRI('xsd:date')
       return null
 
     isInlist: ->
