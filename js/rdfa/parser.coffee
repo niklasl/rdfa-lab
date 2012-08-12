@@ -163,18 +163,19 @@
 
   class State
     constructor: (@base, @profile, resolveURI) ->
+      @resolveURI = resolveURI
       @mapper = new Mapper(null, contexts[@profile])
       @lang = null
+
       @lists = {}
       @hanging = {present: false, rels: null, revs: null, lists: null}
       @result = null
       @current = null
-      @resolveURI = resolveURI
 
-    createInherited: (base, lang, vocab, prefixes) ->
+    createSubState: (base, lang, vocab, prefixes) ->
       subState = inherit(this)
       subState.lang = if lang? then lang else @lang
-      subState.mapper = @mapper.createInherited(vocab, prefixes)
+      subState.mapper = @mapper.createSubMap(vocab, prefixes)
       return subState
 
     expandTermOrCurieOrIRI: (expr) ->
@@ -190,7 +191,7 @@
   class Mapper
     constructor: (@vocab=null, @map={}) ->
 
-    createInherited: (vocab, prefixes) ->
+    createSubMap: (vocab, prefixes) ->
       vocab ?= @vocab
       subMap = inherit(@map)
       for pfx, iri of prefixes
@@ -303,7 +304,7 @@
       @attrs = @el.attributes
       @tagName = @el.nodeName.toLowerCase()
       @errors = []
-      @state = parentState.createInherited(
+      @state = parentState.createSubState(
         @getBase(), @getLang(), @getVocab(), @getPrefixes())
 
     getBase: ->
@@ -470,6 +471,8 @@
   exports.extract = extract
   exports.Description = Description
   exports.State = State
+  exports.Mapper = Mapper
+  exports.ElementData = ElementData
   exports.contexts = contexts
 
 )(exports ? RDFaParser = {})

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>rdfa-dom-usage</title>
+    <script src="../js/rdfa/parser.js"></script>
+    <script src="../js/rdfa/dom.js"></script>
+    <script>
+      window.onload = function () {
+        RDFaDOM.init();
+
+        var titles = RDFaDOM.getElementsByProperty("http://purl.org/dc/terms/title");
+        console.log(titles);
+
+        var seeAlso = RDFaDOM.getElementsByLink(
+            "http://xmlns.com/foaf/0.1/page", "http://example.org/");
+        console.log(seeAlso);
+
+        var persons = RDFaDOM.getElementsByType("http://schema.org/Person");
+        console.log(persons);
+
+      };
+    </script>
+  </head>
+  <body>
+    <h1 property="dc:title">rdfa-dom-usage</h1>
+    <article vocab="http://schema.org/" typeof="Person">
+      <p>
+        By <span property="name foaf:name">
+      </p>
+    </article>
+    <footer>
+      See also
+      <a rel="foaf:page" href="http://example.org/">example.org</a>
+      website.
+    </footer>
+  </body>
+</html>
