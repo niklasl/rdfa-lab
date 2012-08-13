@@ -3,34 +3,86 @@
   <head>
     <meta charset="utf-8" />
     <title>rdfa-dom-usage</title>
+    <link rel="stylesheet" href="../css/rdfa.css" />
     <script src="../js/rdfa/parser.js"></script>
     <script src="../js/rdfa/dom.js"></script>
     <script>
-      window.onload = function () {
-        RDFaDOM.init();
+      document.addEventListener('DOMContentLoaded', function () {
 
-        var titles = RDFaDOM.getElementsByProperty("http://purl.org/dc/terms/title");
-        console.log(titles);
+        rdfa = RDFaDOM.init();
 
-        var seeAlso = RDFaDOM.getElementsByLink(
-            "http://xmlns.com/foaf/0.1/page", "http://example.org/");
-        console.log(seeAlso);
+        var titles = rdfa.getElementsByProperty("http://purl.org/dc/terms/title");
+        console.log("titles:", titles);
 
-        var persons = RDFaDOM.getElementsByType("http://schema.org/Person");
-        console.log(persons);
+        var pages = rdfa.getElementsByProperty("http://xmlns.com/foaf/0.1/page",
+            "http://example.org/");
+        console.log("pages:", pages);
 
-      };
+        var exOrg = rdfa.getElementsBySubject("http://example.org/");
+        console.log("example.org:", exOrg);
+
+        var persons = rdfa.getElementsByType("http://schema.org/Person");
+        console.log("persons:", persons);
+
+        // It's nearly live:
+        function getLabels() {
+          return rdfa.getElementsByProperty("http://www.w3.org/2000/01/rdf-schema#label");
+        }
+        console.log("labels", getLabels());
+        document.getElementsByTagName('span')[0].attributes.property.value += " rdfs:label";
+        setTimeout(function () { console.log("labels", getLabels()); });
+
+        /* Next steps...
+
+        var seeAlso = document.rdfa.getElementsByProperty(
+            "http://xmlns.com/foaf/0.1/page", {
+              resource: "http://example.org/",
+              content: null, lang: null, datatype: null, inlist: false });
+
+        document.rdfa.baseContext (.vocab, .prefixes, .lang, [.profile])
+                     .context.subContext(vocabStr, preficMap, langStr)
+
+        seeAlso[0].rdfa // null unless element contains RDFa attributes
+                  .rdfa.activeContext
+                  .rdfa.typeList
+                  .rdfa.propertyElements // in full: this if @about + predicate
+                  .rdfa.subject // active subject for predicates; in full: from this if @about
+                  .rdfa.subjectElement // in full: this if @about
+                  .rdfa.propertyList
+                  .rdfa.datatype
+                  .rdfa.content
+                  .rdfa.resource
+                  .rdfa.inlist // in full: from parentRe(l|v)Element if completing hanging
+                  .rdfa.about // full only
+                  .rdfa.relList // full only; from parentRe(l|v)Element if completing hanging
+                  .rdfa.revList // -||-
+                  // full only: if element is completed via a hanging predicate
+                  .rdfa.parentRelElement
+                  .rdfa.parentRevElement
+                  // full only: if element has hanging predicate
+                  .rdfa.hangingSubject
+                  .rdfa.childObjectElements
+        */
+
+      });
     </script>
   </head>
   <body>
-    <h1 property="dc:title">rdfa-dom-usage</h1>
-    <article vocab="http://schema.org/" typeof="Person">
-      <p>
-        By <span property="name foaf:name">
-      </p>
-    </article>
+    <section about="http://example.org/" vocab="http://schema.org/">
+      <h1 property="dc:title">rdfa-dom-usage</h1>
+      <article property="foaf:topic" typeof="Person">
+        <p>
+          By <span property="name foaf:name">Some Body</span>.
+        </p>
+      </article>
+      <article property="foaf:topic" resource="/other" typeof="Person">
+        <p>
+          With <span property="name foaf:name">Some Other</span>.
+        </p>
+      </article>
+    </section>
     <footer>
-      See also
+      The
       <a rel="foaf:page" href="http://example.org/">example.org</a>
       website.
     </footer>
