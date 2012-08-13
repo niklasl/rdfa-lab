@@ -35,4 +35,4 @@
                        args[last]);
   };
 
-})(typeof exports !== 'undefined'? exports : lore = {});
+})(typeof exports !== 'undefined'? exports : Lore = {});
