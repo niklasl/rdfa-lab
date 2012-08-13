@@ -40,9 +40,9 @@ var RDFaDOM = {
     for (var l=this.refs, it=null, i=0; it=l[i++];) {
       this.expandCURIE(ctx, el, it);
     }
-    // TODO:
-    //this.resolveRef(ctx, el, 'href');
-    //this.resolveRef(ctx, el, 'src');
+    // TODO: only resolveRef (and set resource proxy)
+    this.expandCURIE(ctx, el, 'href');
+    this.expandCURIE(ctx, el, 'src');
   },
 
   expandTermOrCURIE: function (ctx, el, attr) {
