@@ -116,15 +116,15 @@ RDFaDOM.DocumentAccessor.prototype = {
         "[data-rdfa-rel~='"+ p +"']");
   },
 
-  getElementsByType: function (p) {
-    return this.doc.querySelectorAll("[data-rdfa-typeof~='"+ p +"']");
+  getElementsByType: function (t) {
+    return this.doc.querySelectorAll("[data-rdfa-typeof~='"+ t +"']");
   },
 
-  getElementsBySubject: function (p) {
+  getElementsBySubject: function (s) {
     return this.doc.querySelectorAll(
-      "[data-rdfa-about~='"+ p +"'], " +
-        "[data-rdfa-resource~='"+ p +"'][typeof], " +
-          "[data-rdfa-resource~='"+ p +"']:not([property])");
+      "[data-rdfa-about~='"+ s +"'], " +
+        "[data-rdfa-resource~='"+ s +"'][typeof], " +
+          "[data-rdfa-resource~='"+ s +"']:not([property])");
   },
 
   getElementsByLink: function (p, o) {
