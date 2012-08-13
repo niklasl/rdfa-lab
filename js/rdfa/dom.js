@@ -66,8 +66,13 @@ var RDFaDOM = {
   //getElementsBySubjectAndProperty...
 
   setupObserver: function (doc) {
-    if (typeof MutationObserver === 'undefined')
-      return;
+    if (typeof MutationObserver === 'undefined') {
+      if (typeof WebKitMutationObserver === 'function') {
+        MutationObserver = WebKitMutationObserver;
+      } else {
+        return;
+      }
+    }
     // TODO: all attrs; re-compute context where needed and getInheritedContext...
     var self = this;
     var opts = {attributes: true, subtree: true, characterData: false};
