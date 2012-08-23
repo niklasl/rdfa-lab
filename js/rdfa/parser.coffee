@@ -5,113 +5,115 @@
   RDFA_USES_VOCAB = "http://www.w3.org/ns/rdfa#usesVocabulary"
 
 
+  getNextBNode = null
+
   extract = (doc, base, profile='html') ->
-    state = builder.init(doc, base, profile)
+    getNextBNode = bnodeCounter()
+    state = init(doc, base, profile)
+    #builder = new Builder()
+    builder.start(state)
     walk(doc.documentElement, state)
     return builder.complete(state)
 
+  init = (doc, base, profile) ->
+    resolver = doc.createElement('a')
+    resolveURI = (ref) ->
+      resolver.href = ref
+      return resolver.href
+    if doc.getElementsByTagName('base').length
+      base = resolveURI('')
+    state = new State(base, profile, resolveURI)
+    return state
+
   walk = (el, state) ->
     if el.attributes.length
-      subState = builder.visit(el, state)
+      #desc = getDescription(el, state)
+      desc = new Description(el, state) # el.rdfa
+      change = builder.visit(desc, state)
+      if change
+        state = state.createSubState(desc, change.subject, change.incomplete)
     for child in el.childNodes
       if child.nodeType is 1
-        walk(child, subState or state)
+        walk(child, state)
 
-
-  nextBNode = null
 
   builder =
 
-    init: (doc, base, profile) ->
-      nextBNode = bnodeCounter()
-      resolver = doc.createElement('a')
-      resolveURI = (ref) ->
-        resolver.href = ref
-        return resolver.href
-      if doc.getElementsByTagName('base').length
-        base = resolveURI('')
-      state = new State(base, profile, resolveURI)
-      docObj = {"@id": base}
-      all = {}
-      all[base] = docObj
-      #context = {}
-      state.current = docObj
-      state.result = {all: all}
-      return state
+    start: (state) ->
+      state.result = {all: {}}
+      getOrCreateNode(state.result, state.context.base)
+      return null
 
-    visit: (el, state) ->
-      desc = new Description(el, state)
-      res = state.result
-      current = state.current
-      nextObj = null
+    visit: (desc, state) ->
+      result = state.result
 
-      if desc.usesVocab
-        baseObj = getOrCreate(res, state.base)
-        addPropToObj(baseObj, RDFA_USES_VOCAB, desc.usesVocab)
+      if desc.vocab
+        baseObj = getOrCreateNode(result, desc.context.base)
+        addPropToObj(baseObj, RDFA_USES_VOCAB, desc.vocab)
+
+      s = desc.subject or desc.parentSubject
+      currentNode = getOrCreateNode(result, s)
+      localNode = getOrCreateNode(result, desc.subject or desc.resource)
+
+      rels = desc.linkProperties
+      revs = desc.reverseLinkProperties
+      props = desc.contentProperties
+      inlist = desc.inlist
+      incomplete = desc.parentIncomplete
+      hasLinks = rels.length or revs.length
+
+      unless desc.subject or hasLinks or props.length
+        return {subject: s, incomplete: incomplete}
+
+      if incomplete
+        completedNode = getOrCreateNode(result, incomplete.subject)
+        if desc.subject
+          completingNode = localNode
+        else
+          completingNode = getOrCreateNode(result, incomplete.incompleteSubject)
+          currentNode = completingNode
+        if completingNode
+          adder = if incomplete.inlist then addToPropListToObj else addPropToObj
+          for rel in incomplete.linkProperties
+            adder(completedNode, rel, {'@id': completingNode['@id']})
+          for rev in incomplete.reverseLinkProperties
+            adder(completingNode, rev, {'@id': completedNode['@id']})
+          incomplete = null
+
+      if hasLinks and not desc.resource
+        incomplete = {
+          linkProperties: rels, reverseLinkProperties: revs, inlist: inlist,
+          subject: s, incompleteSubject: getNextBNode()}
 
       types = desc.types
-
-      s = desc.getSubject()
-      if s
-        current = getOrCreate(res, s)
-
-      o = desc.getReference()
-      if o
-        unless desc.propertiesAsLinks and not types
-          nextObj = getOrCreate(res, o)
-
       if types
-        typed = if desc.about or not nextObj then current else nextObj
         for type in types
-          addPropToObj(typed, "@type", type)
+          addPropToObj(localNode, "@type", type)
 
-      rels = desc.getLinks()
-      revs = desc.getRevLinks()
-      inlist = desc.inlist
+      adder = if inlist then addToPropListToObj else addPropToObj
 
-      hanging = state.hanging
-      if hanging
-        # TODO: this just supports connecting resource; see commented below
-        if o
-          s = null
-          current = state.current
-          rels = hanging.rels
-          revs = hanging.revs
-          inlist = hanging.inlist
-          hanging = null
-        #if not (s or o) and (desc.rels or desc.revs or desc.properties)
-        #  hangingSubject = hanging.subject
-        #  nextHanging
-        #else if s or o
-        #  attach to state.current: hangingSubject or if s then current else nextObj
-        #  if hanging.subject used current = hangingSubject
-        #  nextHanging
-
-      if inlist
-        addToObj = addToPropListToObj
-      else
-        addToObj = addPropToObj
-
+      o = desc.resource
+      oNode = null
+      nestedNode = currentNode
       if o
-        for link in rels
-          addToObj(current, link, {"@id": o})
+        oNode = getOrCreateNode(result, o)
+        if desc.scoped
+          nestedNode = oNode
+        oref = {"@id": o}
+        for rel in rels
+          adder(currentNode, rel, oref)
         if revs.length
-          subjRef = {"@id": s or current["@id"]}
+          sref = {"@id": s}
           for rev in revs
-            addToObj(nextObj or getOrCreate(res, o), rev, subjRef)
-        hanging = null
-      else if rels.length or revs.length
-        hanging = {rels: rels, revs: revs, inlist: inlist}
+            adder(oNode, rev, sref)
 
-      value = desc.getLiteral()
-      if value
-        for prop in desc.getValueProperties()
-          addToObj(current, prop, value)
+      content = desc.content
+      if content
+        for prop in props
+          literal = makeLiteral(content, desc.datatype, desc.lang)
+          adder(currentNode, prop, literal)
 
-      subState = desc.state
-      subState.hanging = hanging
-      subState.current = nextObj or current
-      return subState
+      return {subject: nestedNode['@id'], incomplete: incomplete}
 
     complete: (state) ->
       items = []
@@ -129,10 +131,10 @@
       #{'@context': state.result.context, '@graph': items}
 
 
-  getOrCreate = (res, id) ->
-      obj = res.all[id]
+  getOrCreateNode = (result, id) ->
+      obj = result.all[id]
       unless obj
-        obj = res.all[id] = {"@id": id}
+        obj = result.all[id] = {"@id": id}
       obj
 
   addPropToObj = (obj, prop, value) ->
@@ -160,42 +162,41 @@
       obj[prop] = {"@list": values}
     values.push(value)
 
+  makeLiteral = (value, datatype, lang) ->
+    if datatype # and datatype isnt XSD_LANGLITERAL
+      {"@value": value, "@type": datatype}
+    else if lang
+      {"@value": value, "@language": lang}
+    else
+      value
+
 
   class State
-    constructor: (@base, @profile, resolveURI) ->
-      @resolveURI = resolveURI
-      @context = new Context(null, contexts[@profile])
+    constructor: (base, profile, resolveURI) ->
+      @context = new Context(resolveURI, profile, base, null, contexts[profile])
       @lang = null
+      @incomplete = null
+      @subject = base
 
-      @hanging = null
-      @result = null
-      @current = null
-
-    createSubState: (base, lang, vocab, prefixes) ->
+    createSubState: (desc, subject, incomplete) ->
       subState = inherit(this)
-      subState.lang = if lang? then lang else @lang
-      subState.context = @context.createSubContext(vocab, prefixes)
+      subState.context = desc.context
+      subState.lang = desc.lang
+      subState.subject = subject
+      subState.incomplete = incomplete
       return subState
-
-    expandTermOrCurieOrIRI: (expr) ->
-      @context.expandTermOrCurieOrIRI(expr)
-
-    expandCurieOrIRI: (expr) ->
-      @context.expandCurieOrIRI(expr)
-
-    expandAndResolve: (curieOrIri) ->
-      @resolveURI(@expandCurieOrIRI(curieOrIri))
 
 
   class Context
-    constructor: (@vocab=null, @prefixes={}) ->
+    constructor: (@resolveURI, @profile, @base, @vocab=null, @prefixes={}) ->
 
-    createSubContext: (vocab, prefixes) ->
+    createSubContext: (base, vocab, prefixes) ->
+      base ?= @base
       vocab ?= @vocab
-      subMap = inherit(@prefixes)
+      subPrefixes = inherit(@prefixes)
       for pfx, iri of prefixes
-        subMap[pfx] = iri
-      return new Context(vocab, subMap)
+        subPrefixes[pfx] = iri
+      return new Context(@resolveURI, @profile, base, vocab, subPrefixes)
 
     expandTermOrCurieOrIRI: (expr) ->
       iri = @prefixes[expr]
@@ -210,8 +211,13 @@
         return @expandCurieOrIRI(expr)
 
     expandCurieOrIRI: (expr) ->
+      safeCurie = false
+      if expr.match(/^\[(.+)]$/)
+        expr = RegExp.$1
+        safeCurie = true
       i = expr.indexOf(':')
       if i is -1
+        # TODO: if safeCurie then error and return null
         return expr
       pfx = expr.substring(0, i)
       term = expr.substring(i + 1)
@@ -224,72 +230,63 @@
         return ns + term
       return expr
 
+    expandAndResolve: (curieOrIri) ->
+      # TODO: expandOrResolve?
+      iri = @expandCurieOrIRI(curieOrIri)
+      return iri if iri[0] is '_'
+      @resolveURI(iri)
+
 
   ##
   # A representation of the interpreted description formed by the logical
   # attributes of an element. Use this to produce triples.
   class Description
-    constructor: (el, parentState) ->
-      data = new ElementData(el, parentState)
-      @usesVocab = data.getVocab()
-      @state = data.state
-      #@context = data.context
-      @about = data.getAbout()
-      @resource = data.getResource()
+    constructor: (el, state) ->
+      # TODO: state or= computeState(el)
+      @parentSubject = state.subject
+      @parentIncomplete = state.incomplete
+
+      data = new ElementData(el, state.context)
+      @errors = data.errors
+      @lang = data.getLang() ? state.lang
+      @vocab = data.getVocab()
+      @context = data.context
+
       @types = data.getTypes()
-      @properties = data.getProperties()
-      @rels = data.getRels()
-      @revs = data.getRevs()
-      @propertiesAsLinks = !!(@properties and (not (@rels or @revs)) and (@resource or @types))
-        # TODO: .. and not content attr and getReference()
-      if @properties and not @propertiesAsLinks
-        @literal = data.getLiteral()
+
+      props = data.getProperties()
+      resource = data.getResource()
+      rels = data.getRels()
+      revs = data.getRevs()
+      propsAsLinks = !!(props and (not (rels or revs)) and (resource or @types))
+
+      @contentProperties = if (props and not propsAsLinks) then props else []
+      @linkProperties = if rels then rels else if propsAsLinks then props else []
+      @reverseLinkProperties = revs or []
       @inlist = data.isInlist()
 
-    getErrors: ->
-      @data.errors
+      if resource
+        @resource = resource
+      else if @types and (rels or props) # and not content attr
+        @resource = getNextBNode()
 
-    getSubject: ->
-      if @about
-        return @about
-      else if @resource and not ((@rels or @revs) or @propertiesAsLinks)
+      @scoped = @resource and not propsAsLinks or @types
+
+      @subject = data.getAbout() or @getResourceAsSubject()
+
+      # TODO: .. and not content attr and @resource
+      if @contentProperties
+        lit = data.getLiteral()
+        if lit
+          @content = lit.value
+          @datatype = lit.datatype
+
+    getResourceAsSubject: ->
+      links = @linkProperties.length or @reverseLinkProperties.length
+      if @resource and not links
         return @resource
-      else if @types and not (@properties or @rels or @revs)
-        return @newBNode()
-
-    getReference: ->
-      if @resource
-        return @resource
-      else if @types and (@rels or @properties) # and not content attr
-        return @newBNode()
-
-    getLiteral: ->
-      lit = @literal
-      return null unless lit
-      unless lit.lang or lit.datatype
-        lit.value
-      else
-        {"@value": lit.value, "@language": lit.lang, "@type": lit.datatype}
-
-    getLinks: ->
-      if @rels
-        return @rels
-      else if @propertiesAsLinks
-        return @properties
-      else
-        return []
-
-    getValueProperties: ->
-      if @properties and not @propertiesAsLinks
-        return @properties
-      else
-        return []
-
-    getRevLinks: ->
-      if @revs then @revs else []
-
-    newBNode: ->
-      nextBNode() # TODO: marker for proper blank?
+      else if @types and not (@contentProperties.length or links) # TODO: redundancy?
+        return getNextBNode()
 
 
   ##
@@ -297,12 +294,12 @@
   # context mappings into account, but does not interpret the attribute
   # interplay and generation of triples.
   class ElementData
-    constructor: (@el, parentState) ->
+    constructor: (@el, parentContext) ->
       @attrs = @el.attributes
       @tagName = @el.nodeName.toLowerCase()
       @errors = []
-      @state = parentState.createSubState(
-        @getBase(), @getLang(), @getVocab(), @getPrefixes())
+      @context = parentContext.createSubContext(
+        @getBase(), @getVocab(), @getPrefixes())
 
     getBase: ->
       null # xml:base if XML-based profile
@@ -333,15 +330,15 @@
 
     getAbout: ->
       if @attrs.about? #and not parent
-        next = @state.expandAndResolve(@attrs.about.value)
+        next = @context.expandAndResolve(@attrs.about.value)
 
     getResource: ->
       if @attrs.resource?
-        return @state.expandAndResolve(@attrs.resource.value)
+        return @context.expandAndResolve(@attrs.resource.value)
       else if @attrs.href?
-        return @state.resolveURI(@attrs.href.value)
+        return @context.resolveURI(@attrs.href.value)
       else if @attrs.src?
-        return @state.resolveURI(@attrs.src.value)
+        return @context.resolveURI(@attrs.src.value)
 
     getTypes: ->
       # TODO: in jsdom, typeof is expanded to typeof="typeof"
@@ -363,14 +360,14 @@
       return null unless expressions
       result = []
       for expr in expressions
-        iri = @state.expandTermOrCurieOrIRI(expr)
+        iri = @context.expandTermOrCurieOrIRI(expr)
         if iri
           result.push(iri)
       result
 
     getLiteral: ->
       datatype = @getDatatype()
-      lang = @state.lang
+      lang = @getLang()
       if datatype is RDF_XML_LITERAL
         xml = @getXML()
       else
@@ -389,7 +386,7 @@
     getContent: ->
       if @attrs.content?
         return @attrs.content.value
-      else if @state.profile is 'html' and @tagName is 'time'
+      else if @context.profile is 'html' and @tagName is 'time'
         if @attrs.datetime?
           return @attrs.datetime.value
       return @el.textContent
@@ -399,18 +396,20 @@
 
     getDatatype: ->
       if @attrs.datatype?
-        return @state.expandTermOrCurieOrIRI(@attrs.datatype.value)
-      else if @state.profile is 'html' and @tagName is 'time'
+        dt = @attrs.datatype.value
+        return null unless dt
+        return @context.expandTermOrCurieOrIRI(dt)
+      else if @context.profile is 'html' and @tagName is 'time'
         value = @getContent()
         # TODO: use full iri unless compact..
         if value[0] is 'P'
-          return @state.expandTermOrCurieOrIRI('xsd:duration')
+          return @context.expandTermOrCurieOrIRI('xsd:duration')
         if value.indexOf('T') > -1
-          return @state.expandTermOrCurieOrIRI('xsd:dateTime')
+          return @context.expandTermOrCurieOrIRI('xsd:dateTime')
         else if value.indexOf(':') > -1
-          return @state.expandTermOrCurieOrIRI('xsd:time')
+          return @context.expandTermOrCurieOrIRI('xsd:time')
         else
-          return @state.expandTermOrCurieOrIRI('xsd:date')
+          return @context.expandTermOrCurieOrIRI('xsd:date')
       return null
 
     isInlist: ->
@@ -454,6 +453,7 @@
 
 
   bnodeCounter = ->
+    # TODO: marker for proper blank?
     prefix = "_:gen-#{(new Date().getTime()).toString(16)}-"
     count = 0
     return -> prefix + count++
