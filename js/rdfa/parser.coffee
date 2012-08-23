@@ -1,8 +1,10 @@
 ((exports) ->
 
   RDF_IRI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  XHV_IRI = "http://www.w3.org/1999/xhtml/vocab#"
   RDF_XML_LITERAL = RDF_IRI + 'XMLLiteral'
   RDFA_USES_VOCAB = "http://www.w3.org/ns/rdfa#usesVocabulary"
+  ID = '@id'
 
 
   getNextBNode = null
@@ -49,7 +51,7 @@
 
       if desc.vocab
         baseObj = getOrCreateNode(result, desc.context.base)
-        addPropToObj(baseObj, RDFA_USES_VOCAB, desc.vocab)
+        addPropToObj(baseObj, RDFA_USES_VOCAB, {'@id': desc.vocab})
 
       s = desc.subject or desc.parentSubject
       currentNode = getOrCreateNode(result, s)
@@ -75,15 +77,15 @@
         if completingNode
           adder = if incomplete.inlist then addToPropListToObj else addPropToObj
           for rel in incomplete.linkProperties
-            adder(completedNode, rel, {'@id': completingNode['@id']})
+            adder(completedNode, rel, {'@id': completingNode[ID]})
           for rev in incomplete.reverseLinkProperties
-            adder(completingNode, rev, {'@id': completedNode['@id']})
+            adder(completingNode, rev, {'@id': completedNode[ID]})
           incomplete = null
 
       if hasLinks and not desc.resource
         incomplete = {
           linkProperties: rels, reverseLinkProperties: revs, inlist: inlist,
-          subject: s, incompleteSubject: getNextBNode()}
+          subject: currentNode[ID], incompleteSubject: getNextBNode()}
 
       types = desc.types
       if types
@@ -100,31 +102,31 @@
         if desc.scoped
           nestedNode = oNode
         oref = {"@id": o}
-        for rel in rels
-          adder(currentNode, rel, oref)
         if revs.length
           sref = {"@id": s}
           for rev in revs
             adder(oNode, rev, sref)
+      if o or inlist
+        for rel in rels
+          adder(currentNode, rel, oref)
 
       content = desc.content
-      if content
-        for prop in props
+      if content? or inlist
+        if content?
           literal = makeLiteral(content, desc.datatype, desc.lang)
+        for prop in props
           adder(currentNode, prop, literal)
 
-      return {subject: nestedNode['@id'], incomplete: incomplete}
+      return {subject: nestedNode[ID], incomplete: incomplete}
 
     complete: (state) ->
       items = []
       for s, obj of state.result.all
-        add = true
-        if obj["@id"]
-          add = false
-          for key of obj
-            if key != "@id"
-              add = true
-              break
+        add = false
+        for key of obj
+          if key != "@id"
+            add = true
+            break
         if add
           items.push(obj)
       items
@@ -160,7 +162,8 @@
     else
       values = []
       obj[prop] = {"@list": values}
-    values.push(value)
+    if value?
+      values.push(value)
 
   makeLiteral = (value, datatype, lang) ->
     if datatype # and datatype isnt XSD_LANGLITERAL
@@ -199,16 +202,14 @@
       return new Context(@resolveURI, @profile, base, vocab, subPrefixes)
 
     expandTermOrCurieOrIRI: (expr) ->
-      iri = @prefixes[expr]
+      if expr.indexOf(":") isnt -1
+        return @expandCurieOrIRI(expr)
+      if @vocab
+        return @vocab + expr
+      iri = @prefixes[expr] or @prefixes[expr.toLowerCase()]
       if iri
         return iri
-      else if expr.indexOf(":") is -1
-        if @vocab
-          return @vocab + expr
-        else
-          return null
-      else
-        return @expandCurieOrIRI(expr)
+      return null
 
     expandCurieOrIRI: (expr) ->
       safeCurie = false
@@ -225,6 +226,8 @@
         return expr
       if term.slice(0, 2) is "//"
         return expr
+      if pfx.length is 0
+        return XHV_IRI + term
       ns = @prefixes[pfx]
       if ns
         return ns + term
@@ -232,9 +235,13 @@
 
     expandAndResolve: (curieOrIri) ->
       # TODO: expandOrResolve?
+      return null if curieOrIri is '[]'
       iri = @expandCurieOrIRI(curieOrIri)
       return iri if iri[0] is '_'
-      @resolveURI(iri)
+      # TODO: hack to avoid jsdom(?) lowercasing e.g. urn:isbn:* to urn:isbn:*!
+      resolved = @resolveURI(iri)
+      return iri if resolved.length is iri.length
+      return resolved
 
 
   ##
@@ -246,7 +253,7 @@
       @parentSubject = state.subject
       @parentIncomplete = state.incomplete
 
-      data = new ElementData(el, state.context)
+      data = new ElementData(el, state.context, @parentSubject)
       @errors = data.errors
       @lang = data.getLang() ? state.lang
       @vocab = data.getVocab()
@@ -258,7 +265,11 @@
       resource = data.getResource()
       rels = data.getRels()
       revs = data.getRevs()
-      propsAsLinks = !!(props and (not (rels or revs)) and (resource or @types))
+      about = data.getAbout()
+
+      resourceIsTyped = !!(@types and not about)
+      propsAsLinks = !!(props and (not (rels or revs)) and
+          (resource or resourceIsTyped))
 
       @contentProperties = if (props and not propsAsLinks) then props else []
       @linkProperties = if rels then rels else if propsAsLinks then props else []
@@ -267,12 +278,12 @@
 
       if resource
         @resource = resource
-      else if @types and (rels or props) # and not content attr
+      else if resourceIsTyped and (rels or props) # and not content attr
         @resource = getNextBNode()
 
-      @scoped = @resource and not propsAsLinks or @types
+      @scoped = @resource and (not propsAsLinks) or resourceIsTyped
 
-      @subject = data.getAbout() or @getResourceAsSubject()
+      @subject = about or @getResourceAsSubject()
 
       # TODO: .. and not content attr and @resource
       if @contentProperties
@@ -294,9 +305,11 @@
   # context mappings into account, but does not interpret the attribute
   # interplay and generation of triples.
   class ElementData
-    constructor: (@el, parentContext) ->
+    constructor: (@el, parentContext, parentSubject) ->
       @attrs = @el.attributes
+      @isRoot = @el.parentNode is @el.ownerDocument
       @tagName = @el.nodeName.toLowerCase()
+      @parentSubject = parentSubject
       @errors = []
       @context = parentContext.createSubContext(
         @getBase(), @getVocab(), @getPrefixes())
@@ -330,7 +343,11 @@
 
     getAbout: ->
       if @attrs.about? #and not parent
-        next = @context.expandAndResolve(@attrs.about.value)
+        @context.expandAndResolve(@attrs.about.value)
+      else if @isRoot
+        @parentSubject
+      else if (@tagName is 'head' or @tagName is 'body') and not @attrs.resource?
+        @parentSubject
 
     getResource: ->
       if @attrs.resource?
@@ -351,18 +368,26 @@
       @expandAll @attrs.property?.value.split(/\s+/)
 
     getRels: ->
-      @expandAll @attrs.rel?.value.split(/\s+/)
+      @expandAll @attrs.rel?.value.split(/\s+/), true
 
     getRevs: ->
-      @expandAll @attrs.rev?.value.split(/\s+/)
+      @expandAll @attrs.rev?.value.split(/\s+/), true
 
-    expandAll: (expressions) ->
+    expandAll: (expressions, weak=false) ->
       return null unless expressions
       result = []
+      isHtml = @context.profile is 'html'
+      prop = @attrs.property?
+      muted = false
       for expr in expressions
+        if weak and isHtml and prop and expr.indexOf(':') is -1
+          muted = true
+          continue
         iri = @context.expandTermOrCurieOrIRI(expr)
-        if iri
+        if iri and iri[0] isnt '_'
           result.push(iri)
+      if muted and result.length is 0
+        return null
       result
 
     getLiteral: ->
@@ -372,11 +397,10 @@
         xml = @getXML()
       else
         content = @getContent()
-      if content
+      if content?
         if datatype
           return {value: content, datatype: datatype}
         else if lang
-          # TODO: inherited (in compact: if diff. from top-level lang)
           return {value: content, lang: lang}
         else
           return {value: content}
@@ -384,11 +408,13 @@
         return {value: xml, datatype: datatype}
 
     getContent: ->
+      if @context.profile is 'html'
+        if @tagName is 'time' and @attrs.datetime?
+          return @attrs.datetime.value
+        else if @tagName is 'data' and @attrs.value?
+          return @attrs.value.value
       if @attrs.content?
         return @attrs.content.value
-      else if @context.profile is 'html' and @tagName is 'time'
-        if @attrs.datetime?
-          return @attrs.datetime.value
       return @el.textContent
 
     getXML: ->
@@ -402,13 +428,19 @@
       else if @context.profile is 'html' and @tagName is 'time'
         value = @getContent()
         # TODO: use full iri unless compact..
+        if value.indexOf(' ') isnt -1
+          return null
         if value[0] is 'P'
           return @context.expandTermOrCurieOrIRI('xsd:duration')
         if value.indexOf('T') > -1
           return @context.expandTermOrCurieOrIRI('xsd:dateTime')
         else if value.indexOf(':') > -1
           return @context.expandTermOrCurieOrIRI('xsd:time')
-        else
+        else if value.match(/^\d{4,}$/)
+          return @context.expandTermOrCurieOrIRI('xsd:gYear')
+        else if value.match(/^\d{4,}-\d{2}$/)
+          return @context.expandTermOrCurieOrIRI('xsd:gYearMonth')
+        else if value.match(/^\d{4,}-\d{2}-\d{2}(Z|[+-]\d{2}:?\d{2})?$/)
           return @context.expandTermOrCurieOrIRI('xsd:date')
       return null
 

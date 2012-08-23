@@ -2,10 +2,12 @@
 var RDFaParser;
 
 (function(exports) {
-  var Context, Description, ElementData, RDFA_USES_VOCAB, RDF_IRI, RDF_XML_LITERAL, State, addPropToObj, addToPropListToObj, bnodeCounter, builder, contexts, extract, getNextBNode, getOrCreateNode, inherit, init, makeLiteral, walk;
+  var Context, Description, ElementData, ID, RDFA_USES_VOCAB, RDF_IRI, RDF_XML_LITERAL, State, XHV_IRI, addPropToObj, addToPropListToObj, bnodeCounter, builder, contexts, extract, getNextBNode, getOrCreateNode, inherit, init, makeLiteral, walk;
   RDF_IRI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+  XHV_IRI = "http://www.w3.org/1999/xhtml/vocab#";
   RDF_XML_LITERAL = RDF_IRI + 'XMLLiteral';
   RDFA_USES_VOCAB = "http://www.w3.org/ns/rdfa#usesVocabulary";
+  ID = '@id';
   getNextBNode = null;
   extract = function(doc, base, profile) {
     var state;
@@ -65,7 +67,9 @@ var RDFaParser;
       result = state.result;
       if (desc.vocab) {
         baseObj = getOrCreateNode(result, desc.context.base);
-        addPropToObj(baseObj, RDFA_USES_VOCAB, desc.vocab);
+        addPropToObj(baseObj, RDFA_USES_VOCAB, {
+          '@id': desc.vocab
+        });
       }
       s = desc.subject || desc.parentSubject;
       currentNode = getOrCreateNode(result, s);
@@ -96,14 +100,14 @@ var RDFaParser;
           for (_i = 0, _len = _ref.length; _i < _len; _i++) {
             rel = _ref[_i];
             adder(completedNode, rel, {
-              '@id': completingNode['@id']
+              '@id': completingNode[ID]
             });
           }
           _ref1 = incomplete.reverseLinkProperties;
           for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
             rev = _ref1[_j];
             adder(completingNode, rev, {
-              '@id': completedNode['@id']
+              '@id': completedNode[ID]
             });
           }
           incomplete = null;
@@ -114,7 +118,7 @@ var RDFaParser;
           linkProperties: rels,
           reverseLinkProperties: revs,
           inlist: inlist,
-          subject: s,
+          subject: currentNode[ID],
           incompleteSubject: getNextBNode()
         };
       }
@@ -137,30 +141,34 @@ var RDFaParser;
         oref = {
           "@id": o
         };
-        for (_l = 0, _len3 = rels.length; _l < _len3; _l++) {
-          rel = rels[_l];
-          adder(currentNode, rel, oref);
-        }
         if (revs.length) {
           sref = {
             "@id": s
           };
-          for (_m = 0, _len4 = revs.length; _m < _len4; _m++) {
-            rev = revs[_m];
+          for (_l = 0, _len3 = revs.length; _l < _len3; _l++) {
+            rev = revs[_l];
             adder(oNode, rev, sref);
           }
         }
       }
+      if (o || inlist) {
+        for (_m = 0, _len4 = rels.length; _m < _len4; _m++) {
+          rel = rels[_m];
+          adder(currentNode, rel, oref);
+        }
+      }
       content = desc.content;
-      if (content) {
+      if ((content != null) || inlist) {
+        if (content != null) {
+          literal = makeLiteral(content, desc.datatype, desc.lang);
+        }
         for (_n = 0, _len5 = props.length; _n < _len5; _n++) {
           prop = props[_n];
-          literal = makeLiteral(content, desc.datatype, desc.lang);
           adder(currentNode, prop, literal);
         }
       }
       return {
-        subject: nestedNode['@id'],
+        subject: nestedNode[ID],
         incomplete: incomplete
       };
     },
@@ -170,14 +178,11 @@ var RDFaParser;
       _ref = state.result.all;
       for (s in _ref) {
         obj = _ref[s];
-        add = true;
-        if (obj["@id"]) {
-          add = false;
-          for (key in obj) {
-            if (key !== "@id") {
-              add = true;
-              break;
-            }
+        add = false;
+        for (key in obj) {
+          if (key !== "@id") {
+            add = true;
+            break;
           }
         }
         if (add) {
@@ -228,7 +233,9 @@ var RDFaParser;
         "@list": values
       };
     }
-    return values.push(value);
+    if (value != null) {
+      return values.push(value);
+    }
   };
   makeLiteral = function(value, datatype, lang) {
     if (datatype) {
@@ -299,18 +306,17 @@ var RDFaParser;
 
     Context.prototype.expandTermOrCurieOrIRI = function(expr) {
       var iri;
-      iri = this.prefixes[expr];
-      if (iri) {
-        return iri;
-      } else if (expr.indexOf(":") === -1) {
-        if (this.vocab) {
-          return this.vocab + expr;
-        } else {
-          return null;
-        }
-      } else {
+      if (expr.indexOf(":") !== -1) {
         return this.expandCurieOrIRI(expr);
       }
+      if (this.vocab) {
+        return this.vocab + expr;
+      }
+      iri = this.prefixes[expr] || this.prefixes[expr.toLowerCase()];
+      if (iri) {
+        return iri;
+      }
+      return null;
     };
 
     Context.prototype.expandCurieOrIRI = function(expr) {
@@ -332,6 +338,9 @@ var RDFaParser;
       if (term.slice(0, 2) === "//") {
         return expr;
       }
+      if (pfx.length === 0) {
+        return XHV_IRI + term;
+      }
       ns = this.prefixes[pfx];
       if (ns) {
         return ns + term;
@@ -340,12 +349,19 @@ var RDFaParser;
     };
 
     Context.prototype.expandAndResolve = function(curieOrIri) {
-      var iri;
+      var iri, resolved;
+      if (curieOrIri === '[]') {
+        return null;
+      }
       iri = this.expandCurieOrIRI(curieOrIri);
       if (iri[0] === '_') {
         return iri;
       }
-      return this.resolveURI(iri);
+      resolved = this.resolveURI(iri);
+      if (resolved.length === iri.length) {
+        return iri;
+      }
+      return resolved;
     };
 
     return Context;
@@ -356,10 +372,10 @@ var RDFaParser;
     Description.name = 'Description';
 
     function Description(el, state) {
-      var data, lit, props, propsAsLinks, rels, resource, revs, _ref;
+      var about, data, lit, props, propsAsLinks, rels, resource, resourceIsTyped, revs, _ref;
       this.parentSubject = state.subject;
       this.parentIncomplete = state.incomplete;
-      data = new ElementData(el, state.context);
+      data = new ElementData(el, state.context, this.parentSubject);
       this.errors = data.errors;
       this.lang = (_ref = data.getLang()) != null ? _ref : state.lang;
       this.vocab = data.getVocab();
@@ -369,18 +385,20 @@ var RDFaParser;
       resource = data.getResource();
       rels = data.getRels();
       revs = data.getRevs();
-      propsAsLinks = !!(props && (!(rels || revs)) && (resource || this.types));
+      about = data.getAbout();
+      resourceIsTyped = !!(this.types && !about);
+      propsAsLinks = !!(props && (!(rels || revs)) && (resource || resourceIsTyped));
       this.contentProperties = props && !propsAsLinks ? props : [];
       this.linkProperties = rels ? rels : propsAsLinks ? props : [];
       this.reverseLinkProperties = revs || [];
       this.inlist = data.isInlist();
       if (resource) {
         this.resource = resource;
-      } else if (this.types && (rels || props)) {
+      } else if (resourceIsTyped && (rels || props)) {
         this.resource = getNextBNode();
       }
-      this.scoped = this.resource && !propsAsLinks || this.types;
-      this.subject = data.getAbout() || this.getResourceAsSubject();
+      this.scoped = this.resource && (!propsAsLinks) || resourceIsTyped;
+      this.subject = about || this.getResourceAsSubject();
       if (this.contentProperties) {
         lit = data.getLiteral();
         if (lit) {
@@ -407,10 +425,12 @@ var RDFaParser;
 
     ElementData.name = 'ElementData';
 
-    function ElementData(el, parentContext) {
+    function ElementData(el, parentContext, parentSubject) {
       this.el = el;
       this.attrs = this.el.attributes;
+      this.isRoot = this.el.parentNode === this.el.ownerDocument;
       this.tagName = this.el.nodeName.toLowerCase();
+      this.parentSubject = parentSubject;
       this.errors = [];
       this.context = parentContext.createSubContext(this.getBase(), this.getVocab(), this.getPrefixes());
     }
@@ -459,9 +479,12 @@ var RDFaParser;
     };
 
     ElementData.prototype.getAbout = function() {
-      var next;
       if (this.attrs.about != null) {
-        return next = this.context.expandAndResolve(this.attrs.about.value);
+        return this.context.expandAndResolve(this.attrs.about.value);
+      } else if (this.isRoot) {
+        return this.parentSubject;
+      } else if ((this.tagName === 'head' || this.tagName === 'body') && !(this.attrs.resource != null)) {
+        return this.parentSubject;
       }
     };
 
@@ -501,26 +524,39 @@ var RDFaParser;
 
     ElementData.prototype.getRels = function() {
       var _ref;
-      return this.expandAll((_ref = this.attrs.rel) != null ? _ref.value.split(/\s+/) : void 0);
+      return this.expandAll((_ref = this.attrs.rel) != null ? _ref.value.split(/\s+/) : void 0, true);
     };
 
     ElementData.prototype.getRevs = function() {
       var _ref;
-      return this.expandAll((_ref = this.attrs.rev) != null ? _ref.value.split(/\s+/) : void 0);
+      return this.expandAll((_ref = this.attrs.rev) != null ? _ref.value.split(/\s+/) : void 0, true);
     };
 
-    ElementData.prototype.expandAll = function(expressions) {
-      var expr, iri, result, _i, _len;
+    ElementData.prototype.expandAll = function(expressions, weak) {
+      var expr, iri, isHtml, muted, prop, result, _i, _len;
+      if (weak == null) {
+        weak = false;
+      }
       if (!expressions) {
         return null;
       }
       result = [];
+      isHtml = this.context.profile === 'html';
+      prop = this.attrs.property != null;
+      muted = false;
       for (_i = 0, _len = expressions.length; _i < _len; _i++) {
         expr = expressions[_i];
+        if (weak && isHtml && prop && expr.indexOf(':') === -1) {
+          muted = true;
+          continue;
+        }
         iri = this.context.expandTermOrCurieOrIRI(expr);
-        if (iri) {
+        if (iri && iri[0] !== '_') {
           result.push(iri);
         }
+      }
+      if (muted && result.length === 0) {
+        return null;
       }
       return result;
     };
@@ -534,7 +570,7 @@ var RDFaParser;
       } else {
         content = this.getContent();
       }
-      if (content) {
+      if (content != null) {
         if (datatype) {
           return {
             value: content,
@@ -559,12 +595,15 @@ var RDFaParser;
     };
 
     ElementData.prototype.getContent = function() {
+      if (this.context.profile === 'html') {
+        if (this.tagName === 'time' && (this.attrs.datetime != null)) {
+          return this.attrs.datetime.value;
+        } else if (this.tagName === 'data' && (this.attrs.value != null)) {
+          return this.attrs.value.value;
+        }
+      }
       if (this.attrs.content != null) {
         return this.attrs.content.value;
-      } else if (this.context.profile === 'html' && this.tagName === 'time') {
-        if (this.attrs.datetime != null) {
-          return this.attrs.datetime.value;
-        }
       }
       return this.el.textContent;
     };
@@ -583,6 +622,9 @@ var RDFaParser;
         return this.context.expandTermOrCurieOrIRI(dt);
       } else if (this.context.profile === 'html' && this.tagName === 'time') {
         value = this.getContent();
+        if (value.indexOf(' ') !== -1) {
+          return null;
+        }
         if (value[0] === 'P') {
           return this.context.expandTermOrCurieOrIRI('xsd:duration');
         }
@@ -590,7 +632,11 @@ var RDFaParser;
           return this.context.expandTermOrCurieOrIRI('xsd:dateTime');
         } else if (value.indexOf(':') > -1) {
           return this.context.expandTermOrCurieOrIRI('xsd:time');
-        } else {
+        } else if (value.match(/^\d{4,}$/)) {
+          return this.context.expandTermOrCurieOrIRI('xsd:gYear');
+        } else if (value.match(/^\d{4,}-\d{2}$/)) {
+          return this.context.expandTermOrCurieOrIRI('xsd:gYearMonth');
+        } else if (value.match(/^\d{4,}-\d{2}-\d{2}(Z|[+-]\d{2}:?\d{2})?$/)) {
           return this.context.expandTermOrCurieOrIRI('xsd:date');
         }
       }
