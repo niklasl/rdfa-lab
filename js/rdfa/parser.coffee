@@ -164,7 +164,7 @@
   class State
     constructor: (@base, @profile, resolveURI) ->
       @resolveURI = resolveURI
-      @mapper = new Mapper(null, contexts[@profile])
+      @context = new Context(null, contexts[@profile])
       @lang = null
 
       @lists = {}
@@ -175,31 +175,31 @@
     createSubState: (base, lang, vocab, prefixes) ->
       subState = inherit(this)
       subState.lang = if lang? then lang else @lang
-      subState.mapper = @mapper.createSubMap(vocab, prefixes)
+      subState.context = @context.createSubContext(vocab, prefixes)
       return subState
 
     expandTermOrCurieOrIRI: (expr) ->
-      @mapper.expandTermOrCurieOrIRI(expr)
+      @context.expandTermOrCurieOrIRI(expr)
 
     expandCurieOrIRI: (expr) ->
-      @mapper.expandCurieOrIRI(expr)
+      @context.expandCurieOrIRI(expr)
 
     expandAndResolve: (curieOrIri) ->
       @resolveURI(@expandCurieOrIRI(curieOrIri))
 
 
-  class Mapper
-    constructor: (@vocab=null, @map={}) ->
+  class Context
+    constructor: (@vocab=null, @prefixes={}) ->
 
-    createSubMap: (vocab, prefixes) ->
+    createSubContext: (vocab, prefixes) ->
       vocab ?= @vocab
-      subMap = inherit(@map)
+      subMap = inherit(@prefixes)
       for pfx, iri of prefixes
         subMap[pfx] = iri
-      return new Mapper(vocab, subMap)
+      return new Context(vocab, subMap)
 
     expandTermOrCurieOrIRI: (expr) ->
-      iri = @map[expr]
+      iri = @prefixes[expr]
       if iri
         return iri
       else if expr.indexOf(":") is -1
@@ -220,7 +220,7 @@
         return expr
       if term.slice(0, 2) is "//"
         return expr
-      ns = @map[pfx]
+      ns = @prefixes[pfx]
       if ns
         return ns + term
       return expr
@@ -231,12 +231,10 @@
   # attributes of an element. Use this to produce triples.
   class Description
     constructor: (el, parentState) ->
-      #@data =
       data = new ElementData(el, parentState)
       @usesVocab = data.getVocab()
       @state = data.state
-      @tagName = data.tagName
-      #@mapper = data.mapper
+      #@context = data.context
       @about = data.getAbout()
       @resource = data.getResource()
       @types = data.getTypes()
@@ -471,7 +469,7 @@
   exports.extract = extract
   exports.Description = Description
   exports.State = State
-  exports.Mapper = Mapper
+  exports.Context = Context
   exports.ElementData = ElementData
   exports.contexts = contexts
 
