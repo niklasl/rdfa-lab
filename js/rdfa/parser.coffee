@@ -70,7 +70,7 @@
       inlist = desc.inlist
 
       hanging = state.hanging
-      if hanging.present
+      if hanging
         # TODO: this just supports connecting resource; see commented below
         if o
           s = null
@@ -78,7 +78,7 @@
           rels = hanging.rels
           revs = hanging.revs
           inlist = hanging.inlist
-          hanging = {present: false}
+          hanging = null
         #if not (s or o) and (desc.rels or desc.revs or desc.properties)
         #  hangingSubject = hanging.subject
         #  nextHanging
@@ -99,9 +99,9 @@
           subjRef = {"@id": s or current["@id"]}
           for rev in revs
             addToObj(nextObj or getOrCreate(res, o), rev, subjRef)
-      else
-        present = !!(rels.length or revs.length)
-        hanging = {present: present, rels: rels, revs: revs, inlist: inlist}
+        hanging = null
+      else if rels.length or revs.length
+        hanging = {rels: rels, revs: revs, inlist: inlist}
 
       value = desc.getLiteral()
       if value
@@ -167,8 +167,7 @@
       @context = new Context(null, contexts[@profile])
       @lang = null
 
-      @lists = {}
-      @hanging = {present: false, rels: null, revs: null, lists: null}
+      @hanging = null
       @result = null
       @current = null
 
