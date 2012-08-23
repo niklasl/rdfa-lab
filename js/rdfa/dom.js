@@ -20,14 +20,12 @@ var RDFaDOM = {
   },
 
   initialContext: function () {
-    return new RDFaParser.Context(null, RDFaParser.contexts.html);
+    return new RDFaParser.Context(null, 'html', null, null, RDFaParser.contexts.html);
   },
 
   subContext: function (el, ctx) {
-    function ElData() { this.attrs = el.attributes; };
-    ElData.prototype = RDFaParser.ElementData.prototype;
-    var data = new ElData();
-    return ctx.createSubContext(data.getVocab(), data.getPrefixes());
+    var data = new RDFaParser.ElementData(el, ctx, null);
+    return data.context;
   },
 
   attrs: ['property', 'typeof', 'rel', 'rev'],
