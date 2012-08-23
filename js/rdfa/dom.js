@@ -20,14 +20,14 @@ var RDFaDOM = {
   },
 
   initialContext: function () {
-    return new RDFaParser.Mapper(null, RDFaParser.contexts.html);
+    return new RDFaParser.Context(null, RDFaParser.contexts.html);
   },
 
   subContext: function (el, ctx) {
     function ElData() { this.attrs = el.attributes; };
     ElData.prototype = RDFaParser.ElementData.prototype;
     var data = new ElData();
-    return ctx.createSubMap(data.getVocab(), data.getPrefixes());
+    return ctx.createSubContext(data.getVocab(), data.getPrefixes());
   },
 
   attrs: ['property', 'typeof', 'rel', 'rev'],
@@ -35,22 +35,22 @@ var RDFaDOM = {
 
   expandInElement: function (ctx, el) {
     for (var l=this.attrs, it=null, i=0; it=l[i++];) {
-      this.expandTermOrCURIE(ctx, el, it);
+      this.expandTermOrCurie(ctx, el, it);
     }
     for (var l=this.refs, it=null, i=0; it=l[i++];) {
-      this.expandCURIE(ctx, el, it);
+      this.expandRef(ctx, el, it);
     }
     // TODO: only resolveRef (and set resource proxy)
-    this.expandCURIE(ctx, el, 'href');
-    this.expandCURIE(ctx, el, 'src');
+    this.expandRef(ctx, el, 'href');
+    this.expandRef(ctx, el, 'src');
   },
 
-  expandTermOrCURIE: function (ctx, el, attr) {
+  expandTermOrCurie: function (ctx, el, attr) {
     var expand = function (v) { return ctx.expandTermOrCurieOrIRI(v); };
     return this.runExpand(expand, el, attr);
   },
 
-  expandCURIE: function (ctx, el, attr) {
+  expandRef: function (ctx, el, attr) {
     var expand = function (v) { return ctx.expandCurieOrIRI(v); };
     return this.runExpand(expand, el, attr, 'resource');
   },
@@ -88,10 +88,10 @@ var RDFaDOM = {
         // TODO: if typeof or prefix: set context and recompute subtree
         if (self.attrs.indexOf(attr) > -1) {
           var ctx = RDFaDOM.initialContext();
-          RDFaDOM.expandTermOrCURIE(ctx, target, attr);
+          RDFaDOM.expandTermOrCurie(ctx, target, attr);
         } else if (self.refs.indexOf(attr) > -1) {
           ctx = ctx || RDFaDOM.initialContext();
-          RDFaDOM.expandCURIE(ctx, target, attr);
+          RDFaDOM.expandRef(ctx, target, attr);
         }
         // re-observe after disconnect
         observer.observe(doc, opts);
