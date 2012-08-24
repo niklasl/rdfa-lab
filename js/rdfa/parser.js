@@ -63,7 +63,7 @@ var RDFaParser;
       return null;
     },
     visit: function(desc, state) {
-      var adder, baseObj, completedNode, completingNode, content, currentNode, hasLinks, incomplete, inlist, literal, localNode, nestedNode, o, oNode, oref, prop, props, rel, rels, result, rev, revs, s, sref, type, types, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _m, _n, _ref, _ref1;
+      var activeSubject, adder, baseObj, completedNode, completingNode, content, currentNode, hasLinks, incomplete, inlist, links, literal, localNode, nestedNode, oNode, oref, prop, props, rel, resource, result, rev, revLinks, sref, type, types, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _m, _n, _ref, _ref1;
       result = state.result;
       if (desc.vocab) {
         baseObj = getOrCreateNode(result, desc.context.base);
@@ -71,18 +71,18 @@ var RDFaParser;
           '@id': desc.vocab
         });
       }
-      s = desc.subject || desc.parentSubject;
-      currentNode = getOrCreateNode(result, s);
+      activeSubject = desc.subject || desc.parentSubject;
+      currentNode = getOrCreateNode(result, activeSubject);
       localNode = getOrCreateNode(result, desc.subject || desc.resource);
-      rels = desc.linkProperties;
-      revs = desc.reverseLinkProperties;
+      links = desc.linkProperties;
+      revLinks = desc.reverseLinkProperties;
       props = desc.contentProperties;
       inlist = desc.inlist;
       incomplete = desc.parentIncomplete;
-      hasLinks = rels.length || revs.length;
+      hasLinks = links.length || revLinks.length;
       if (!(desc.subject || hasLinks || props.length)) {
         return {
-          subject: s,
+          subject: activeSubject,
           incomplete: incomplete
         };
       }
@@ -115,8 +115,8 @@ var RDFaParser;
       }
       if (hasLinks && !desc.resource) {
         incomplete = {
-          linkProperties: rels,
-          reverseLinkProperties: revs,
+          linkProperties: links,
+          reverseLinkProperties: revLinks,
           inlist: inlist,
           subject: currentNode[ID],
           incompleteSubject: getNextBNode()
@@ -130,30 +130,30 @@ var RDFaParser;
         }
       }
       adder = inlist ? addToPropListToObj : addPropToObj;
-      o = desc.resource;
+      resource = desc.resource;
       oNode = null;
       nestedNode = currentNode;
-      if (o) {
-        oNode = getOrCreateNode(result, o);
+      if (resource) {
+        oNode = getOrCreateNode(result, resource);
         if (desc.scoped) {
           nestedNode = oNode;
         }
         oref = {
-          "@id": o
+          "@id": resource
         };
-        if (revs.length) {
+        if (revLinks.length) {
           sref = {
-            "@id": s
+            "@id": activeSubject
           };
-          for (_l = 0, _len3 = revs.length; _l < _len3; _l++) {
-            rev = revs[_l];
+          for (_l = 0, _len3 = revLinks.length; _l < _len3; _l++) {
+            rev = revLinks[_l];
             adder(oNode, rev, sref);
           }
         }
       }
-      if (o || inlist) {
-        for (_m = 0, _len4 = rels.length; _m < _len4; _m++) {
-          rel = rels[_m];
+      if (resource || inlist) {
+        for (_m = 0, _len4 = links.length; _m < _len4; _m++) {
+          rel = links[_m];
           adder(currentNode, rel, oref);
         }
       }

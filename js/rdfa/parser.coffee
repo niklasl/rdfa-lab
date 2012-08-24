@@ -53,19 +53,19 @@
         baseObj = getOrCreateNode(result, desc.context.base)
         addPropToObj(baseObj, RDFA_USES_VOCAB, {'@id': desc.vocab})
 
-      s = desc.subject or desc.parentSubject
-      currentNode = getOrCreateNode(result, s)
+      activeSubject = desc.subject or desc.parentSubject
+      currentNode = getOrCreateNode(result, activeSubject)
       localNode = getOrCreateNode(result, desc.subject or desc.resource)
 
-      rels = desc.linkProperties
-      revs = desc.reverseLinkProperties
+      links = desc.linkProperties
+      revLinks = desc.reverseLinkProperties
       props = desc.contentProperties
       inlist = desc.inlist
       incomplete = desc.parentIncomplete
-      hasLinks = rels.length or revs.length
+      hasLinks = links.length or revLinks.length
 
       unless desc.subject or hasLinks or props.length
-        return {subject: s, incomplete: incomplete}
+        return {subject: activeSubject, incomplete: incomplete}
 
       if incomplete
         completedNode = getOrCreateNode(result, incomplete.subject)
@@ -84,7 +84,7 @@
 
       if hasLinks and not desc.resource
         incomplete = {
-          linkProperties: rels, reverseLinkProperties: revs, inlist: inlist,
+          linkProperties: links, reverseLinkProperties: revLinks, inlist: inlist,
           subject: currentNode[ID], incompleteSubject: getNextBNode()}
 
       types = desc.types
@@ -94,20 +94,20 @@
 
       adder = if inlist then addToPropListToObj else addPropToObj
 
-      o = desc.resource
+      resource = desc.resource
       oNode = null
       nestedNode = currentNode
-      if o
-        oNode = getOrCreateNode(result, o)
+      if resource
+        oNode = getOrCreateNode(result, resource)
         if desc.scoped
           nestedNode = oNode
-        oref = {"@id": o}
-        if revs.length
-          sref = {"@id": s}
-          for rev in revs
+        oref = {"@id": resource}
+        if revLinks.length
+          sref = {"@id": activeSubject}
+          for rev in revLinks
             adder(oNode, rev, sref)
-      if o or inlist
-        for rel in rels
+      if resource or inlist
+        for rel in links
           adder(currentNode, rel, oref)
 
       content = desc.content
