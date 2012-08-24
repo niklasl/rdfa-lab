@@ -372,7 +372,7 @@ var RDFaParser;
     Description.name = 'Description';
 
     function Description(el, state) {
-      var about, data, lit, props, propsAsLinks, rels, resource, resourceIsTyped, revs, _ref;
+      var about, data, hasContentAttrs, lit, props, propsAsLinks, rels, resource, resourceIsTyped, revs, _ref;
       this.parentSubject = state.subject;
       this.parentIncomplete = state.incomplete;
       data = new ElementData(el, state.context, this.parentSubject);
@@ -387,7 +387,8 @@ var RDFaParser;
       revs = data.getRevs();
       about = data.getAbout();
       resourceIsTyped = !!(this.types && !about);
-      propsAsLinks = !!(props && (!(rels || revs)) && (resource || resourceIsTyped));
+      hasContentAttrs = !!((data.contentAttr != null) || (data.datatypeAttr != null));
+      propsAsLinks = !!(props && (!(rels || revs)) && (resource || resourceIsTyped) && !hasContentAttrs);
       this.contentProperties = props && !propsAsLinks ? props : [];
       this.linkProperties = rels ? rels : propsAsLinks ? props : [];
       this.reverseLinkProperties = revs || [];
@@ -397,7 +398,7 @@ var RDFaParser;
       } else if (resourceIsTyped && (rels || props)) {
         this.resource = getNextBNode();
       }
-      this.scoped = this.resource && (!propsAsLinks) || resourceIsTyped;
+      this.scoped = this.resource && (!(propsAsLinks || hasContentAttrs)) || resourceIsTyped;
       this.subject = about || this.getResourceAsSubject();
       if (this.contentProperties) {
         lit = data.getLiteral();
@@ -433,6 +434,8 @@ var RDFaParser;
       this.parentSubject = parentSubject;
       this.errors = [];
       this.context = parentContext.createSubContext(this.getBase(), this.getVocab(), this.getPrefixes());
+      this.contentAttr = this.getContentAttr();
+      this.datatypeAttr = this.getDatatypeAttr();
     }
 
     ElementData.prototype.getBase = function() {
@@ -442,6 +445,30 @@ var RDFaParser;
     ElementData.prototype.getLang = function() {
       var _ref, _ref1;
       return ((_ref = this.attrs['xml:lang']) != null ? _ref.value : void 0) || ((_ref1 = this.attrs.lang) != null ? _ref1.value : void 0);
+    };
+
+    ElementData.prototype.getContentAttr = function() {
+      if (this.context.profile === 'html') {
+        if (this.tagName === 'time' && (this.attrs.datetime != null)) {
+          return this.attrs.datetime.value;
+        } else if (this.tagName === 'data' && (this.attrs.value != null)) {
+          return this.attrs.value.value;
+        }
+      }
+      if (this.attrs.content != null) {
+        return this.attrs.content.value;
+      }
+    };
+
+    ElementData.prototype.getDatatypeAttr = function() {
+      var dt;
+      if (this.attrs.datatype != null) {
+        dt = this.attrs.datatype.value;
+        if (!dt) {
+          return "";
+        }
+        return this.context.expandTermOrCurieOrIRI(dt);
+      }
     };
 
     ElementData.prototype.getVocab = function() {
@@ -595,17 +622,7 @@ var RDFaParser;
     };
 
     ElementData.prototype.getContent = function() {
-      if (this.context.profile === 'html') {
-        if (this.tagName === 'time' && (this.attrs.datetime != null)) {
-          return this.attrs.datetime.value;
-        } else if (this.tagName === 'data' && (this.attrs.value != null)) {
-          return this.attrs.value.value;
-        }
-      }
-      if (this.attrs.content != null) {
-        return this.attrs.content.value;
-      }
-      return this.el.textContent;
+      return this.contentAttr || this.el.textContent;
     };
 
     ElementData.prototype.getXML = function() {
@@ -613,13 +630,9 @@ var RDFaParser;
     };
 
     ElementData.prototype.getDatatype = function() {
-      var dt, value;
-      if (this.attrs.datatype != null) {
-        dt = this.attrs.datatype.value;
-        if (!dt) {
-          return null;
-        }
-        return this.context.expandTermOrCurieOrIRI(dt);
+      var value;
+      if (this.datatypeAttr) {
+        return this.datatypeAttr;
       } else if (this.context.profile === 'html' && this.tagName === 'time') {
         value = this.getContent();
         if (value.indexOf(' ') !== -1) {

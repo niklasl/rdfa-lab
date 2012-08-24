@@ -268,8 +268,9 @@
       about = data.getAbout()
 
       resourceIsTyped = !!(@types and not about)
+      hasContentAttrs = !!(data.contentAttr? or data.datatypeAttr?)
       propsAsLinks = !!(props and (not (rels or revs)) and
-          (resource or resourceIsTyped))
+          (resource or resourceIsTyped) and not hasContentAttrs)
 
       @contentProperties = if (props and not propsAsLinks) then props else []
       @linkProperties = if rels then rels else if propsAsLinks then props else []
@@ -278,14 +279,13 @@
 
       if resource
         @resource = resource
-      else if resourceIsTyped and (rels or props) # and not content attr
+      else if resourceIsTyped and (rels or props)
         @resource = getNextBNode()
 
-      @scoped = @resource and (not propsAsLinks) or resourceIsTyped
+      @scoped = @resource and (not (propsAsLinks or hasContentAttrs)) or resourceIsTyped
 
       @subject = about or @getResourceAsSubject()
 
-      # TODO: .. and not content attr and @resource
       if @contentProperties
         lit = data.getLiteral()
         if lit
@@ -313,12 +313,29 @@
       @errors = []
       @context = parentContext.createSubContext(
         @getBase(), @getVocab(), @getPrefixes())
+      @contentAttr = @getContentAttr()
+      @datatypeAttr = @getDatatypeAttr()
 
     getBase: ->
       null # xml:base if XML-based profile
 
     getLang: ->
       @attrs['xml:lang']?.value or @attrs.lang?.value
+
+    getContentAttr: ->
+      if @context.profile is 'html'
+        if @tagName is 'time' and @attrs.datetime?
+          return @attrs.datetime.value
+        else if @tagName is 'data' and @attrs.value?
+          return @attrs.value.value
+      if @attrs.content?
+        return @attrs.content.value
+
+    getDatatypeAttr: ->
+      if @attrs.datatype?
+        dt = @attrs.datatype.value
+        return "" unless dt
+        return @context.expandTermOrCurieOrIRI(dt)
 
     getVocab: ->
       @attrs.vocab?.value
@@ -408,23 +425,14 @@
         return {value: xml, datatype: datatype}
 
     getContent: ->
-      if @context.profile is 'html'
-        if @tagName is 'time' and @attrs.datetime?
-          return @attrs.datetime.value
-        else if @tagName is 'data' and @attrs.value?
-          return @attrs.value.value
-      if @attrs.content?
-        return @attrs.content.value
-      return @el.textContent
+      return @contentAttr or @el.textContent
 
     getXML: ->
       @el.innerHTML
 
     getDatatype: ->
-      if @attrs.datatype?
-        dt = @attrs.datatype.value
-        return null unless dt
-        return @context.expandTermOrCurieOrIRI(dt)
+      if @datatypeAttr
+        return @datatypeAttr
       else if @context.profile is 'html' and @tagName is 'time'
         value = @getContent()
         # TODO: use full iri unless compact..
