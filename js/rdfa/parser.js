@@ -2,22 +2,18 @@
 var RDFaParser;
 
 (function(exports) {
-  var Context, Description, ElementData, ID, RDFA_USES_VOCAB, RDF_IRI, RDF_XML_LITERAL, State, XHV_IRI, addPropToObj, addToPropListToObj, bnodeCounter, builder, contexts, extract, getNextBNode, getOrCreateNode, inherit, init, makeLiteral, walk;
+  var Context, Description, ElementData, RDF_IRI, RDF_XML_LITERAL, State, XHV_IRI, bnodeCounter, contexts, inherit, init, parse, walk;
   RDF_IRI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
   XHV_IRI = "http://www.w3.org/1999/xhtml/vocab#";
   RDF_XML_LITERAL = RDF_IRI + 'XMLLiteral';
-  RDFA_USES_VOCAB = "http://www.w3.org/ns/rdfa#usesVocabulary";
-  ID = '@id';
-  getNextBNode = null;
-  extract = function(doc, base, profile) {
+  parse = function(builder, doc, base, profile) {
     var state;
     if (profile == null) {
       profile = 'html';
     }
-    getNextBNode = bnodeCounter();
     state = init(doc, base, profile);
     builder.start(state);
-    walk(doc.documentElement, state);
+    walk(builder, doc.documentElement, state);
     return builder.complete(state);
   };
   init = function(doc, base, profile) {
@@ -33,7 +29,7 @@ var RDFaParser;
     state = new State(base, profile, resolveURI);
     return state;
   };
-  walk = function(el, state) {
+  walk = function(builder, el, state) {
     var change, child, desc, _i, _len, _ref, _results;
     if (el.attributes.length) {
       desc = new Description(el, state);
@@ -47,210 +43,12 @@ var RDFaParser;
     for (_i = 0, _len = _ref.length; _i < _len; _i++) {
       child = _ref[_i];
       if (child.nodeType === 1) {
-        _results.push(walk(child, state));
+        _results.push(walk(builder, child, state));
       } else {
         _results.push(void 0);
       }
     }
     return _results;
-  };
-  builder = {
-    start: function(state) {
-      state.result = {
-        all: {}
-      };
-      getOrCreateNode(state.result, state.context.base);
-      return null;
-    },
-    visit: function(desc, state) {
-      var activeSubject, adder, baseObj, completedNode, completingNode, content, currentNode, hasLinks, incomplete, inlist, links, literal, localNode, nestedNode, oNode, oref, prop, props, rel, resource, result, rev, revLinks, sref, type, types, _i, _j, _k, _l, _len, _len1, _len2, _len3, _len4, _len5, _m, _n, _ref, _ref1;
-      result = state.result;
-      if (desc.vocab) {
-        baseObj = getOrCreateNode(result, desc.context.base);
-        addPropToObj(baseObj, RDFA_USES_VOCAB, {
-          '@id': desc.vocab
-        });
-      }
-      activeSubject = desc.subject || desc.parentSubject;
-      currentNode = getOrCreateNode(result, activeSubject);
-      localNode = getOrCreateNode(result, desc.subject || desc.resource);
-      links = desc.linkProperties;
-      revLinks = desc.reverseLinkProperties;
-      props = desc.contentProperties;
-      inlist = desc.inlist;
-      incomplete = desc.parentIncomplete;
-      hasLinks = links.length || revLinks.length;
-      if (!(desc.subject || hasLinks || props.length)) {
-        return {
-          subject: activeSubject,
-          incomplete: incomplete
-        };
-      }
-      if (incomplete) {
-        completedNode = getOrCreateNode(result, incomplete.subject);
-        if (desc.subject) {
-          completingNode = localNode;
-        } else {
-          completingNode = getOrCreateNode(result, incomplete.incompleteSubject);
-          currentNode = completingNode;
-        }
-        if (completingNode) {
-          adder = incomplete.inlist ? addToPropListToObj : addPropToObj;
-          _ref = incomplete.linkProperties;
-          for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-            rel = _ref[_i];
-            adder(completedNode, rel, {
-              '@id': completingNode[ID]
-            });
-          }
-          _ref1 = incomplete.reverseLinkProperties;
-          for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
-            rev = _ref1[_j];
-            adder(completingNode, rev, {
-              '@id': completedNode[ID]
-            });
-          }
-          incomplete = null;
-        }
-      }
-      if (hasLinks && !desc.resource) {
-        incomplete = {
-          linkProperties: links,
-          reverseLinkProperties: revLinks,
-          inlist: inlist,
-          subject: currentNode[ID],
-          incompleteSubject: getNextBNode()
-        };
-      }
-      types = desc.types;
-      if (types) {
-        for (_k = 0, _len2 = types.length; _k < _len2; _k++) {
-          type = types[_k];
-          addPropToObj(localNode, "@type", type);
-        }
-      }
-      adder = inlist ? addToPropListToObj : addPropToObj;
-      resource = desc.resource;
-      oNode = null;
-      nestedNode = currentNode;
-      if (resource) {
-        oNode = getOrCreateNode(result, resource);
-        if (desc.scoped) {
-          nestedNode = oNode;
-        }
-        oref = {
-          "@id": resource
-        };
-        if (revLinks.length) {
-          sref = {
-            "@id": activeSubject
-          };
-          for (_l = 0, _len3 = revLinks.length; _l < _len3; _l++) {
-            rev = revLinks[_l];
-            adder(oNode, rev, sref);
-          }
-        }
-      }
-      if (resource || inlist) {
-        for (_m = 0, _len4 = links.length; _m < _len4; _m++) {
-          rel = links[_m];
-          adder(currentNode, rel, oref);
-        }
-      }
-      content = desc.content;
-      if ((content != null) || inlist) {
-        if (content != null) {
-          literal = makeLiteral(content, desc.datatype, desc.lang);
-        }
-        for (_n = 0, _len5 = props.length; _n < _len5; _n++) {
-          prop = props[_n];
-          adder(currentNode, prop, literal);
-        }
-      }
-      return {
-        subject: nestedNode[ID],
-        incomplete: incomplete
-      };
-    },
-    complete: function(state) {
-      var add, items, key, obj, s, _ref;
-      items = [];
-      _ref = state.result.all;
-      for (s in _ref) {
-        obj = _ref[s];
-        add = false;
-        for (key in obj) {
-          if (key !== "@id") {
-            add = true;
-            break;
-          }
-        }
-        if (add) {
-          items.push(obj);
-        }
-      }
-      return items;
-    }
-  };
-  getOrCreateNode = function(result, id) {
-    var obj;
-    obj = result.all[id];
-    if (!obj) {
-      obj = result.all[id] = {
-        "@id": id
-      };
-    }
-    return obj;
-  };
-  addPropToObj = function(obj, prop, value) {
-    var values;
-    values = obj[prop];
-    if (!values) {
-      values = obj[prop] = [];
-    } else if (!values.push) {
-      values = obj[prop] = [values];
-    }
-    return values.push(value);
-  };
-  addToPropListToObj = function(obj, prop, value) {
-    var l, values;
-    values = obj[prop];
-    if (values instanceof Array) {
-      if (values[0]['@list']) {
-        values = values[0]['@list'];
-      } else {
-        l = [];
-        values.unshift({
-          '@list': l
-        });
-        values = l;
-      }
-    } else if (values) {
-      values = values['@list'];
-    } else {
-      values = [];
-      obj[prop] = {
-        "@list": values
-      };
-    }
-    if (value != null) {
-      return values.push(value);
-    }
-  };
-  makeLiteral = function(value, datatype, lang) {
-    if (datatype) {
-      return {
-        "@value": value,
-        "@type": datatype
-      };
-    } else if (lang) {
-      return {
-        "@value": value,
-        "@language": lang
-      };
-    } else {
-      return value;
-    }
   };
   State = (function() {
 
@@ -261,6 +59,7 @@ var RDFaParser;
       this.lang = null;
       this.incomplete = null;
       this.subject = base;
+      this.getNextBNode = bnodeCounter();
     }
 
     State.prototype.createSubState = function(desc, subject, incomplete) {
@@ -276,6 +75,14 @@ var RDFaParser;
     return State;
 
   })();
+  bnodeCounter = function() {
+    var count, prefix;
+    prefix = "_:gen-" + ((new Date().getTime()).toString(16)) + "-";
+    count = 0;
+    return function() {
+      return prefix + count++;
+    };
+  };
   Context = (function() {
 
     Context.name = 'Context';
@@ -372,7 +179,7 @@ var RDFaParser;
     Description.name = 'Description';
 
     function Description(el, state) {
-      var about, data, hasContentAttrs, lit, props, propsAsLinks, rels, resource, resourceIsTyped, revs, _ref;
+      var about, data, hasContentAttrs, hasLinks, lit, props, propsAsLinks, rels, resource, resourceIsTyped, revs, _ref;
       this.parentSubject = state.subject;
       this.parentIncomplete = state.incomplete;
       data = new ElementData(el, state.context, this.parentSubject);
@@ -396,10 +203,19 @@ var RDFaParser;
       if (resource) {
         this.resource = resource;
       } else if (resourceIsTyped && (rels || props)) {
-        this.resource = getNextBNode();
+        this.resource = state.getNextBNode();
       }
       this.scoped = this.resource && (!(propsAsLinks || hasContentAttrs)) || resourceIsTyped;
-      this.subject = about || this.getResourceAsSubject();
+      if (about) {
+        this.subject = about;
+      } else {
+        hasLinks = this.linkProperties.length || this.reverseLinkProperties.length;
+        if (this.resource && !hasLinks) {
+          this.subject = this.resource;
+        } else if (this.types && !(this.contentProperties.length || hasLinks)) {
+          this.subject = state.getNextBNode();
+        }
+      }
       if (this.contentProperties) {
         lit = data.getLiteral();
         if (lit) {
@@ -408,16 +224,6 @@ var RDFaParser;
         }
       }
     }
-
-    Description.prototype.getResourceAsSubject = function() {
-      var links;
-      links = this.linkProperties.length || this.reverseLinkProperties.length;
-      if (this.resource && !links) {
-        return this.resource;
-      } else if (this.types && !(this.contentProperties.length || links)) {
-        return getNextBNode();
-      }
-    };
 
     return Description;
 
@@ -698,21 +504,13 @@ var RDFaParser;
       "role": "http://www.w3.org/1999/xhtml/vocab#role"
     }
   };
-  bnodeCounter = function() {
-    var count, prefix;
-    prefix = "_:gen-" + ((new Date().getTime()).toString(16)) + "-";
-    count = 0;
-    return function() {
-      return prefix + count++;
-    };
-  };
   inherit = function(obj) {
     var ctor;
     ctor = function() {};
     ctor.prototype = obj;
     return new ctor;
   };
-  exports.extract = extract;
+  exports.parse = parse;
   exports.Description = Description;
   exports.State = State;
   exports.Context = Context;

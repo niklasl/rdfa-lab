@@ -3,18 +3,12 @@
   RDF_IRI = "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
   XHV_IRI = "http://www.w3.org/1999/xhtml/vocab#"
   RDF_XML_LITERAL = RDF_IRI + 'XMLLiteral'
-  RDFA_USES_VOCAB = "http://www.w3.org/ns/rdfa#usesVocabulary"
-  ID = '@id'
 
 
-  getNextBNode = null
-
-  extract = (doc, base, profile='html') ->
-    getNextBNode = bnodeCounter()
+  parse = (builder, doc, base, profile='html') ->
     state = init(doc, base, profile)
-    #builder = new Builder()
     builder.start(state)
-    walk(doc.documentElement, state)
+    walk(builder, doc.documentElement, state)
     return builder.complete(state)
 
   init = (doc, base, profile) ->
@@ -27,7 +21,7 @@
     state = new State(base, profile, resolveURI)
     return state
 
-  walk = (el, state) ->
+  walk = (builder, el, state) ->
     if el.attributes.length
       #desc = getDescription(el, state)
       desc = new Description(el, state) # el.rdfa
@@ -36,142 +30,7 @@
         state = state.createSubState(desc, change.subject, change.incomplete)
     for child in el.childNodes
       if child.nodeType is 1
-        walk(child, state)
-
-
-  builder =
-
-    start: (state) ->
-      state.result = {all: {}}
-      getOrCreateNode(state.result, state.context.base)
-      return null
-
-    visit: (desc, state) ->
-      result = state.result
-
-      if desc.vocab
-        baseObj = getOrCreateNode(result, desc.context.base)
-        addPropToObj(baseObj, RDFA_USES_VOCAB, {'@id': desc.vocab})
-
-      activeSubject = desc.subject or desc.parentSubject
-      currentNode = getOrCreateNode(result, activeSubject)
-      localNode = getOrCreateNode(result, desc.subject or desc.resource)
-
-      links = desc.linkProperties
-      revLinks = desc.reverseLinkProperties
-      props = desc.contentProperties
-      inlist = desc.inlist
-      incomplete = desc.parentIncomplete
-      hasLinks = links.length or revLinks.length
-
-      unless desc.subject or hasLinks or props.length
-        return {subject: activeSubject, incomplete: incomplete}
-
-      if incomplete
-        completedNode = getOrCreateNode(result, incomplete.subject)
-        if desc.subject
-          completingNode = localNode
-        else
-          completingNode = getOrCreateNode(result, incomplete.incompleteSubject)
-          currentNode = completingNode
-        if completingNode
-          adder = if incomplete.inlist then addToPropListToObj else addPropToObj
-          for rel in incomplete.linkProperties
-            adder(completedNode, rel, {'@id': completingNode[ID]})
-          for rev in incomplete.reverseLinkProperties
-            adder(completingNode, rev, {'@id': completedNode[ID]})
-          incomplete = null
-
-      if hasLinks and not desc.resource
-        incomplete = {
-          linkProperties: links, reverseLinkProperties: revLinks, inlist: inlist,
-          subject: currentNode[ID], incompleteSubject: getNextBNode()}
-
-      types = desc.types
-      if types
-        for type in types
-          addPropToObj(localNode, "@type", type)
-
-      adder = if inlist then addToPropListToObj else addPropToObj
-
-      resource = desc.resource
-      oNode = null
-      nestedNode = currentNode
-      if resource
-        oNode = getOrCreateNode(result, resource)
-        if desc.scoped
-          nestedNode = oNode
-        oref = {"@id": resource}
-        if revLinks.length
-          sref = {"@id": activeSubject}
-          for rev in revLinks
-            adder(oNode, rev, sref)
-      if resource or inlist
-        for rel in links
-          adder(currentNode, rel, oref)
-
-      content = desc.content
-      if content? or inlist
-        if content?
-          literal = makeLiteral(content, desc.datatype, desc.lang)
-        for prop in props
-          adder(currentNode, prop, literal)
-
-      return {subject: nestedNode[ID], incomplete: incomplete}
-
-    complete: (state) ->
-      items = []
-      for s, obj of state.result.all
-        add = false
-        for key of obj
-          if key != "@id"
-            add = true
-            break
-        if add
-          items.push(obj)
-      items
-      #{'@context': state.result.context, '@graph': items}
-
-
-  getOrCreateNode = (result, id) ->
-      obj = result.all[id]
-      unless obj
-        obj = result.all[id] = {"@id": id}
-      obj
-
-  addPropToObj = (obj, prop, value) ->
-    values = obj[prop]
-    unless values
-      values = obj[prop] = []
-    else unless values.push
-      values = obj[prop] = [values]
-    values.push(value)
-
-  addToPropListToObj = (obj, prop, value) ->
-    values = obj[prop]
-    # TODO: list in Array or direct object (latter prevents sets of mixed refs+lists)
-    if values instanceof Array
-      if values[0]['@list']
-        values = values[0]['@list']
-      else
-        l = []
-        values.unshift({'@list': l})
-        values = l
-    else if values
-      values = values['@list']
-    else
-      values = []
-      obj[prop] = {"@list": values}
-    if value?
-      values.push(value)
-
-  makeLiteral = (value, datatype, lang) ->
-    if datatype # and datatype isnt XSD_LANGLITERAL
-      {"@value": value, "@type": datatype}
-    else if lang
-      {"@value": value, "@language": lang}
-    else
-      value
+        walk(builder, child, state)
 
 
   class State
@@ -180,6 +39,7 @@
       @lang = null
       @incomplete = null
       @subject = base
+      @getNextBNode = bnodeCounter()
 
     createSubState: (desc, subject, incomplete) ->
       subState = inherit(this)
@@ -188,6 +48,12 @@
       subState.subject = subject
       subState.incomplete = incomplete
       return subState
+
+  bnodeCounter = ->
+    # TODO: marker for proper blank?
+    prefix = "_:gen-#{(new Date().getTime()).toString(16)}-"
+    count = 0
+    return -> prefix + count++
 
 
   class Context
@@ -280,24 +146,24 @@
       if resource
         @resource = resource
       else if resourceIsTyped and (rels or props)
-        @resource = getNextBNode()
+        @resource = state.getNextBNode()
 
       @scoped = @resource and (not (propsAsLinks or hasContentAttrs)) or resourceIsTyped
 
-      @subject = about or @getResourceAsSubject()
+      if about
+        @subject = about
+      else
+        hasLinks = @linkProperties.length or @reverseLinkProperties.length
+        if @resource and not hasLinks
+          @subject = @resource
+        else if @types and not (@contentProperties.length or hasLinks) # TODO: redundancy?
+          @subject = state.getNextBNode()
 
       if @contentProperties
         lit = data.getLiteral()
         if lit
           @content = lit.value
           @datatype = lit.datatype
-
-    getResourceAsSubject: ->
-      links = @linkProperties.length or @reverseLinkProperties.length
-      if @resource and not links
-        return @resource
-      else if @types and not (@contentProperties.length or links) # TODO: redundancy?
-        return getNextBNode()
 
 
   ##
@@ -492,20 +358,13 @@
     }
 
 
-  bnodeCounter = ->
-    # TODO: marker for proper blank?
-    prefix = "_:gen-#{(new Date().getTime()).toString(16)}-"
-    count = 0
-    return -> prefix + count++
-
-
   inherit = (obj) ->
     ctor = () ->
     ctor.prototype = obj
     return new ctor
 
 
-  exports.extract = extract
+  exports.parse = parse
   exports.Description = Description
   exports.State = State
   exports.Context = Context
