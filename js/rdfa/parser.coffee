@@ -138,9 +138,9 @@
       propsAsLinks = !!(props and (not (rels or revs)) and
           (resource or resourceIsTyped) and not hasContentAttrs)
 
-      @contentProperties = if (props and not propsAsLinks) then props else []
-      @linkProperties = if rels then rels else if propsAsLinks then props else []
-      @reverseLinkProperties = revs or []
+      @contentProperties = if (props and not propsAsLinks) then props else null
+      @linkProperties = if rels then rels else if propsAsLinks then props else null
+      @reverseLinkProperties = revs or null
       @inlist = data.isInlist()
 
       if resource
@@ -153,10 +153,10 @@
       if about
         @subject = about
       else
-        hasLinks = @linkProperties.length or @reverseLinkProperties.length
+        hasLinks = @linkProperties or @reverseLinkProperties
         if @resource and not hasLinks
           @subject = @resource
-        else if @types and not (@contentProperties.length or hasLinks) # TODO: redundancy?
+        else if @types and not (@contentProperties or hasLinks) # TODO: redundancy?
           @subject = state.getNextBNode()
 
       if @contentProperties

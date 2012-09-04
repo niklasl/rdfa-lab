@@ -196,9 +196,9 @@ var RDFaParser;
       resourceIsTyped = !!(this.types && !about);
       hasContentAttrs = !!((data.contentAttr != null) || (data.datatypeAttr != null));
       propsAsLinks = !!(props && (!(rels || revs)) && (resource || resourceIsTyped) && !hasContentAttrs);
-      this.contentProperties = props && !propsAsLinks ? props : [];
-      this.linkProperties = rels ? rels : propsAsLinks ? props : [];
-      this.reverseLinkProperties = revs || [];
+      this.contentProperties = props && !propsAsLinks ? props : null;
+      this.linkProperties = rels ? rels : propsAsLinks ? props : null;
+      this.reverseLinkProperties = revs || null;
       this.inlist = data.isInlist();
       if (resource) {
         this.resource = resource;
@@ -209,10 +209,10 @@ var RDFaParser;
       if (about) {
         this.subject = about;
       } else {
-        hasLinks = this.linkProperties.length || this.reverseLinkProperties.length;
+        hasLinks = this.linkProperties || this.reverseLinkProperties;
         if (this.resource && !hasLinks) {
           this.subject = this.resource;
-        } else if (this.types && !(this.contentProperties.length || hasLinks)) {
+        } else if (this.types && !(this.contentProperties || hasLinks)) {
           this.subject = state.getNextBNode();
         }
       }

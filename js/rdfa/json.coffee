@@ -32,9 +32,9 @@
       props = desc.contentProperties
       inlist = desc.inlist
       incomplete = desc.parentIncomplete
-      hasLinks = links.length or revLinks.length
+      hasLinks = !!(links or revLinks)
 
-      unless desc.subject or hasLinks or props.length
+      unless desc.subject or hasLinks or props
         return {subject: activeSubject, incomplete: incomplete}
 
       if incomplete
@@ -45,10 +45,12 @@
           completingNode = getOrCreateNode(result, incomplete.incompleteSubject)
           currentNode = completingNode
         adder = if incomplete.inlist then addToPropListToObj else addPropToObj
-        for rel in incomplete.linkProperties
-          adder(completedNode, rel, {'@id': completingNode[ID]})
-        for rev in incomplete.reverseLinkProperties
-          adder(completingNode, rev, {'@id': completedNode[ID]})
+        if incomplete.linkProperties
+          for rel in incomplete.linkProperties
+            adder(completedNode, rel, {'@id': completingNode[ID]})
+        if incomplete.reverseLinkProperties
+          for rev in incomplete.reverseLinkProperties
+            adder(completingNode, rev, {'@id': completedNode[ID]})
         incomplete = null
 
       if hasLinks and not desc.resource
@@ -71,20 +73,22 @@
         if desc.scoped
           nestedNode = oNode
         oref = {"@id": resource}
-        if revLinks.length
+        if revLinks
           sref = {"@id": activeSubject}
           for rev in revLinks
             adder(oNode, rev, sref)
       if resource or inlist
-        for rel in links
-          adder(currentNode, rel, oref)
+        if links
+          for rel in links
+            adder(currentNode, rel, oref)
 
       content = desc.content
       if content? or inlist
         if content?
           literal = makeLiteral(content, desc.datatype, desc.lang)
-        for prop in props
-          adder(currentNode, prop, literal)
+        if props
+          for prop in props
+            adder(currentNode, prop, literal)
 
       return {subject: nestedNode[ID], incomplete: incomplete}
 

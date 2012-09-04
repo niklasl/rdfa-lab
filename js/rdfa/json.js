@@ -39,8 +39,8 @@ var RDFaJSON;
       props = desc.contentProperties;
       inlist = desc.inlist;
       incomplete = desc.parentIncomplete;
-      hasLinks = links.length || revLinks.length;
-      if (!(desc.subject || hasLinks || props.length)) {
+      hasLinks = !!(links || revLinks);
+      if (!(desc.subject || hasLinks || props)) {
         return {
           subject: activeSubject,
           incomplete: incomplete
@@ -55,19 +55,23 @@ var RDFaJSON;
           currentNode = completingNode;
         }
         adder = incomplete.inlist ? addToPropListToObj : addPropToObj;
-        _ref = incomplete.linkProperties;
-        for (_i = 0, _len = _ref.length; _i < _len; _i++) {
-          rel = _ref[_i];
-          adder(completedNode, rel, {
-            '@id': completingNode[ID]
-          });
+        if (incomplete.linkProperties) {
+          _ref = incomplete.linkProperties;
+          for (_i = 0, _len = _ref.length; _i < _len; _i++) {
+            rel = _ref[_i];
+            adder(completedNode, rel, {
+              '@id': completingNode[ID]
+            });
+          }
         }
-        _ref1 = incomplete.reverseLinkProperties;
-        for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
-          rev = _ref1[_j];
-          adder(completingNode, rev, {
-            '@id': completedNode[ID]
-          });
+        if (incomplete.reverseLinkProperties) {
+          _ref1 = incomplete.reverseLinkProperties;
+          for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
+            rev = _ref1[_j];
+            adder(completingNode, rev, {
+              '@id': completedNode[ID]
+            });
+          }
         }
         incomplete = null;
       }
@@ -99,7 +103,7 @@ var RDFaJSON;
         oref = {
           "@id": resource
         };
-        if (revLinks.length) {
+        if (revLinks) {
           sref = {
             "@id": activeSubject
           };
@@ -110,9 +114,11 @@ var RDFaJSON;
         }
       }
       if (resource || inlist) {
-        for (_m = 0, _len4 = links.length; _m < _len4; _m++) {
-          rel = links[_m];
-          adder(currentNode, rel, oref);
+        if (links) {
+          for (_m = 0, _len4 = links.length; _m < _len4; _m++) {
+            rel = links[_m];
+            adder(currentNode, rel, oref);
+          }
         }
       }
       content = desc.content;
@@ -120,9 +126,11 @@ var RDFaJSON;
         if (content != null) {
           literal = makeLiteral(content, desc.datatype, desc.lang);
         }
-        for (_n = 0, _len5 = props.length; _n < _len5; _n++) {
-          prop = props[_n];
-          adder(currentNode, prop, literal);
+        if (props) {
+          for (_n = 0, _len5 = props.length; _n < _len5; _n++) {
+            prop = props[_n];
+            adder(currentNode, prop, literal);
+          }
         }
       }
       return {
