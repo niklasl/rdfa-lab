@@ -21,7 +21,7 @@
 
       if desc.vocab
         baseObj = getOrCreateNode(result, desc.context.base)
-        addPropToObj(baseObj, RDFA_USES_VOCAB, {'@id': desc.vocab})
+        addPropToObj(state, baseObj, RDFA_USES_VOCAB, {'@id': desc.vocab})
 
       activeSubject = desc.subject or desc.parentSubject
       currentNode = getOrCreateNode(result, activeSubject)
@@ -33,6 +33,9 @@
       inlist = desc.inlist
       incomplete = desc.parentIncomplete
       hasLinks = !!(links or revLinks)
+
+      if state.keepList
+        state.keepList = incomplete isnt null or activeSubject is desc.parentSubject
 
       unless desc.subject or hasLinks or props
         return {subject: activeSubject, incomplete: incomplete}
@@ -47,10 +50,10 @@
         adder = if incomplete.inlist then addToPropListToObj else addPropToObj
         if incomplete.linkProperties
           for rel in incomplete.linkProperties
-            adder(completedNode, rel, {'@id': completingNode[ID]})
+            adder(state, completedNode, rel, {'@id': completingNode[ID]})
         if incomplete.reverseLinkProperties
           for rev in incomplete.reverseLinkProperties
-            adder(completingNode, rev, {'@id': completedNode[ID]})
+            adder(state, completingNode, rev, {'@id': completedNode[ID]})
         incomplete = null
 
       if hasLinks and not desc.resource
@@ -61,7 +64,7 @@
       types = desc.types
       if types
         for type in types
-          addPropToObj(localNode, "@type", type)
+          addPropToObj(state, localNode, "@type", type)
 
       adder = if inlist then addToPropListToObj else addPropToObj
 
@@ -76,11 +79,11 @@
         if revLinks
           sref = {"@id": activeSubject}
           for rev in revLinks
-            adder(oNode, rev, sref)
+            adder(state, oNode, rev, sref)
       if resource or inlist
         if links
           for rel in links
-            adder(currentNode, rel, oref)
+            adder(state, currentNode, rel, oref)
 
       content = desc.content
       if content? or inlist
@@ -88,7 +91,7 @@
           literal = makeLiteral(content, desc.datatype, desc.lang)
         if props
           for prop in props
-            adder(currentNode, prop, literal)
+            adder(state, currentNode, prop, literal)
 
       return {subject: nestedNode[ID], incomplete: incomplete}
 
@@ -111,7 +114,7 @@
         obj = result.all[id] = {"@id": id}
       obj
 
-  addPropToObj = (obj, prop, value) ->
+  addPropToObj = (state, obj, prop, value) ->
     values = obj[prop]
     unless values
       values = obj[prop] = []
@@ -119,23 +122,29 @@
       values = obj[prop] = [values]
     values.push(value)
 
-  addToPropListToObj = (obj, prop, value) ->
+  addToPropListToObj = (state, obj, prop, value) ->
     values = obj[prop]
     # TODO: list in Array or direct object (latter prevents sets of mixed refs+lists)
     if values instanceof Array
-      if values[0]['@list']
+      if values[0]['@list'] and state.keepList
         values = values[0]['@list']
       else
         l = []
         values.unshift({'@list': l})
         values = l
     else if values
-      values = values['@list']
+      if state.keepList
+        values = values['@list']
+      else
+        newList = []
+        obj[prop] = [values, {"@list": newList}]
+        values = newList
     else
       values = []
       obj[prop] = {"@list": values}
     if value?
       values.push(value)
+    state.keepList = true
 
   makeLiteral = (value, datatype, lang) ->
     if datatype # and datatype isnt XSD_LANGLITERAL

@@ -27,7 +27,7 @@ var RDFaJSON;
       result = state.result;
       if (desc.vocab) {
         baseObj = getOrCreateNode(result, desc.context.base);
-        addPropToObj(baseObj, RDFA_USES_VOCAB, {
+        addPropToObj(state, baseObj, RDFA_USES_VOCAB, {
           '@id': desc.vocab
         });
       }
@@ -40,6 +40,9 @@ var RDFaJSON;
       inlist = desc.inlist;
       incomplete = desc.parentIncomplete;
       hasLinks = !!(links || revLinks);
+      if (state.keepList) {
+        state.keepList = incomplete !== null || activeSubject === desc.parentSubject;
+      }
       if (!(desc.subject || hasLinks || props)) {
         return {
           subject: activeSubject,
@@ -59,7 +62,7 @@ var RDFaJSON;
           _ref = incomplete.linkProperties;
           for (_i = 0, _len = _ref.length; _i < _len; _i++) {
             rel = _ref[_i];
-            adder(completedNode, rel, {
+            adder(state, completedNode, rel, {
               '@id': completingNode[ID]
             });
           }
@@ -68,7 +71,7 @@ var RDFaJSON;
           _ref1 = incomplete.reverseLinkProperties;
           for (_j = 0, _len1 = _ref1.length; _j < _len1; _j++) {
             rev = _ref1[_j];
-            adder(completingNode, rev, {
+            adder(state, completingNode, rev, {
               '@id': completedNode[ID]
             });
           }
@@ -88,7 +91,7 @@ var RDFaJSON;
       if (types) {
         for (_k = 0, _len2 = types.length; _k < _len2; _k++) {
           type = types[_k];
-          addPropToObj(localNode, "@type", type);
+          addPropToObj(state, localNode, "@type", type);
         }
       }
       adder = inlist ? addToPropListToObj : addPropToObj;
@@ -109,7 +112,7 @@ var RDFaJSON;
           };
           for (_l = 0, _len3 = revLinks.length; _l < _len3; _l++) {
             rev = revLinks[_l];
-            adder(oNode, rev, sref);
+            adder(state, oNode, rev, sref);
           }
         }
       }
@@ -117,7 +120,7 @@ var RDFaJSON;
         if (links) {
           for (_m = 0, _len4 = links.length; _m < _len4; _m++) {
             rel = links[_m];
-            adder(currentNode, rel, oref);
+            adder(state, currentNode, rel, oref);
           }
         }
       }
@@ -129,7 +132,7 @@ var RDFaJSON;
         if (props) {
           for (_n = 0, _len5 = props.length; _n < _len5; _n++) {
             prop = props[_n];
-            adder(currentNode, prop, literal);
+            adder(state, currentNode, prop, literal);
           }
         }
       }
@@ -168,7 +171,7 @@ var RDFaJSON;
     }
     return obj;
   };
-  addPropToObj = function(obj, prop, value) {
+  addPropToObj = function(state, obj, prop, value) {
     var values;
     values = obj[prop];
     if (!values) {
@@ -178,11 +181,11 @@ var RDFaJSON;
     }
     return values.push(value);
   };
-  addToPropListToObj = function(obj, prop, value) {
-    var l, values;
+  addToPropListToObj = function(state, obj, prop, value) {
+    var l, newList, values;
     values = obj[prop];
     if (values instanceof Array) {
-      if (values[0]['@list']) {
+      if (values[0]['@list'] && state.keepList) {
         values = values[0]['@list'];
       } else {
         l = [];
@@ -192,7 +195,17 @@ var RDFaJSON;
         values = l;
       }
     } else if (values) {
-      values = values['@list'];
+      if (state.keepList) {
+        values = values['@list'];
+      } else {
+        newList = [];
+        obj[prop] = [
+          values, {
+            "@list": newList
+          }
+        ];
+        values = newList;
+      }
     } else {
       values = [];
       obj[prop] = {
@@ -200,8 +213,9 @@ var RDFaJSON;
       };
     }
     if (value != null) {
-      return values.push(value);
+      values.push(value);
     }
+    return state.keepList = true;
   };
   return makeLiteral = function(value, datatype, lang) {
     if (datatype) {
