@@ -193,7 +193,7 @@ var RDFaParser;
       rels = data.getRels();
       revs = data.getRevs();
       about = data.getAbout();
-      resourceIsTyped = !!(this.types && !about);
+      resourceIsTyped = !!(this.types && !data.attrs.about);
       hasContentAttrs = !!((data.contentAttr != null) || (data.datatypeAttr != null));
       propsAsLinks = !!(props && (!(rels || revs)) && (resource || resourceIsTyped) && !hasContentAttrs);
       this.contentProperties = props && !propsAsLinks ? props : null;
@@ -312,21 +312,33 @@ var RDFaParser;
     };
 
     ElementData.prototype.getAbout = function() {
+      var id;
       if (this.attrs.about != null) {
-        return this.context.expandAndResolve(this.attrs.about.value);
-      } else if (this.isRoot) {
+        id = this.context.expandAndResolve(this.attrs.about.value);
+        if (id) {
+          return id;
+        }
+      }
+      if (this.isRoot) {
         return this.parentSubject;
-      } else if ((this.tagName === 'head' || this.tagName === 'body') && !(this.attrs.resource != null)) {
+      }
+      if ((this.tagName === 'head' || this.tagName === 'body') && !(this.attrs.resource != null)) {
         return this.parentSubject;
       }
     };
 
     ElementData.prototype.getResource = function() {
+      var id;
       if (this.attrs.resource != null) {
-        return this.context.expandAndResolve(this.attrs.resource.value);
-      } else if (this.attrs.href != null) {
+        id = this.context.expandAndResolve(this.attrs.resource.value);
+        if (id) {
+          return id;
+        }
+      }
+      if (this.attrs.href != null) {
         return this.context.resolveURI(this.attrs.href.value);
-      } else if (this.attrs.src != null) {
+      }
+      if (this.attrs.src != null) {
         return this.context.resolveURI(this.attrs.src.value);
       }
     };

@@ -133,7 +133,7 @@
       revs = data.getRevs()
       about = data.getAbout()
 
-      resourceIsTyped = !!(@types and not about)
+      resourceIsTyped = !!(@types and not data.attrs.about)
       hasContentAttrs = !!(data.contentAttr? or data.datatypeAttr?)
       propsAsLinks = !!(props and (not (rels or revs)) and
           (resource or resourceIsTyped) and not hasContentAttrs)
@@ -225,19 +225,21 @@
       prefixes
 
     getAbout: ->
-      if @attrs.about? #and not parent
-        @context.expandAndResolve(@attrs.about.value)
-      else if @isRoot
-        @parentSubject
-      else if (@tagName is 'head' or @tagName is 'body') and not @attrs.resource?
-        @parentSubject
+      if @attrs.about?
+        id = @context.expandAndResolve(@attrs.about.value)
+        return id if id
+      if @isRoot
+        return @parentSubject
+      if (@tagName is 'head' or @tagName is 'body') and not @attrs.resource?
+        return @parentSubject
 
     getResource: ->
       if @attrs.resource?
-        return @context.expandAndResolve(@attrs.resource.value)
-      else if @attrs.href?
+        id = @context.expandAndResolve(@attrs.resource.value)
+        return id if id
+      if @attrs.href?
         return @context.resolveURI(@attrs.href.value)
-      else if @attrs.src?
+      if @attrs.src?
         return @context.resolveURI(@attrs.src.value)
 
     getTypes: ->
