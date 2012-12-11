@@ -41,7 +41,7 @@
 
   function Connector(context) {
     this.regularCtx = {};
-    //this.revKey = '@rev';
+    //this.revKey = '@rev'; // TODO: reenable
     this.revs = {};
     this.idKey = ID;
     this.typeKey = TYPE;
@@ -102,7 +102,7 @@
       for (var p in node) {
         var o = node[p];
         if (p === this.idKey) {
-          this.idMap[o] = node;
+          this.mergeNode(node);
         } else if (o instanceof Array) {
           var items = node[p] = [];
           for (var i=0, it=null; it=o[i++];) {
@@ -123,23 +123,38 @@
       }
     },
 
-    mapType: function (type, node) {
-      var types = this.typeMap[type];
-      if (types === undefined) {
-        types = this.typeMap[type] = [];
+    mergeNode: function (node) {
+      var id = node[this.idKey];
+      var nodeCopy = this.idMap[id];
+      if (nodeCopy) {
+        for (var key in node) {
+          nodeCopy[key] = node[key];
+        }
+      } else {
+        nodeCopy = this.idMap[id] = node;
       }
-      types.push(node);
+      return nodeCopy;
     },
 
     importNode: function (node) {
       if (node[this.idKey]) {
-        return toRef(this.idMap[node[this.idKey]], this.idKey);
+        // TODO: always copy nodes...
+        var indexed = this.mergeNode(node);
+        return toRef(indexed, this.idKey);
       } else {
         if (node instanceof Object) {
           this.connectNode(node);
         }
         return node;
       }
+    },
+
+    mapType: function (type, node) {
+      var types = this.typeMap[type];
+      if (types === undefined) {
+        types = this.typeMap[type] = [];
+      }
+      types.push(node);
     },
 
     addRev: function (subj, p, obj) {
