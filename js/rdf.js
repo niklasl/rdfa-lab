@@ -144,6 +144,21 @@
     //},
 
     find: function (params) {
+      if (params.sequence) {
+        var found = [this];
+        for (var l=params.sequence, it=null, i=0; it=l[i++];) {
+          var newfound = [];
+          found.forEach(function (node) { newfound = newfound.concat(node.findNodes(it)) })
+          found = newfound;
+          if (!found) return found;
+        }
+        return found;
+      } else {
+        return this.findNodes(params);
+      }
+    },
+
+    findNodes: function (params) {
       var result;
       if (params.reverse) {
         var iri = this.graph.resolve(params.reverse);
@@ -203,7 +218,7 @@
 
   function parsePropertyPath(path) {
     if (path.indexOf('/') > -1) {
-      return {list: path.split(/\//).map(function (s) {
+      return {sequence: path.split(/\//).map(function (s) {
         return parsePropertyPath(s.trim());
       })};
     } else if (path[0] === '^') {
