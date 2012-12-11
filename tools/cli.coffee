@@ -1,6 +1,6 @@
 fs = require 'fs'
 jsdom = require 'jsdom'
-RDFaJSON = require "../js/rdfa-json"
+RDFaJSON = require "../js/rdfa/json"
 
 run = (window, base) ->
   data = RDFaJSON.extract(window.document, base)
