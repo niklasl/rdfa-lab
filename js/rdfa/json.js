@@ -14,6 +14,12 @@ var RDFaJSON;
     if (profile == null) {
       profile = 'html';
     }
+    if (doc == null) {
+      doc = window.document;
+    }
+    if (!(base && !(typeof window !== "undefined" && window !== null))) {
+      base = window.location.href;
+    }
     return RDFaParser.parse(builder, doc, base, profile);
   };
   builder = {

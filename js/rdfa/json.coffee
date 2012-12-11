@@ -9,6 +9,9 @@
   ID = '@id'
 
   exports.extract = (doc, base, profile='html') ->
+    doc ?= window.document
+    unless base and not window?
+      base = window.location.href
     return RDFaParser.parse(builder, doc, base, profile)
 
   builder =
@@ -154,6 +157,7 @@
     else if lang
       {"@value": value, "@language": lang}
     else
+      #{"@value": value}
       value
 
 )(exports ? RDFaJSON = {})
