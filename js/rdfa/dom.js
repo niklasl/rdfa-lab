@@ -1,4 +1,3 @@
-
 var RDFaDOM = {
 
   init: function (doc) {
@@ -131,7 +130,17 @@ RDFaDOM.DocumentAccessor.prototype = {
         "[data-rdfa-rel~='"+ p +"'][data-rdfa-resource~='"+ o +"']");
   }
 
+  //getElementsByRole: ...
+
 };
+
+/*
+RDFaDOM.ElementRDFaView extends Description
+  getNestedPropertyElements // if subject
+  getParentSubjectElement // if *Properties and not subject
+  getCompletingElements // if hasLinks and not resource
+  getParentIncompleteElement // if parentIncomplete
+*/
 
 if (typeof module !== 'undefined') {
   module.exports = RDFaDOM;
