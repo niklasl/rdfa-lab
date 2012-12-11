@@ -41,12 +41,13 @@
 
   function Connector(context) {
     this.regularCtx = {};
+    //this.revKey = '@rev';
     this.revs = {};
     this.idKey = ID;
     this.typeKey = TYPE;
-    this.idMapKey = null;
+    this.idMapKey = 'all';
     this.idMap = new Volatile();
-    this.typeMapKey = null;
+    this.typeMapKey = 'byType';
     this.typeMap = null;
 
     for (var key in context) {
