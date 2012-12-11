@@ -33,28 +33,24 @@
   <script src="../js/jsonld/core.js"></script>
   <script src="../js/ld.js"></script>
   <pre class="commenttest">
-  var ctx = {
-    iri: "@id", type: "@type",
-    "@vocab": "http://schema.org/", "@language": "en"
-  }
+  var ctx = {iri: "@id", type: "@type",
+    "@vocab": "http://schema.org/", "@language": "en"}
+
   var data = LD.connect(RDFaJSON.extract(document), ctx)
   data.byType.Place.forEach(function (place) {
     print(place.type)
     print(place.name)
-    print(place.geo.longitude)
-    print(place.geo.latitude)
-    //print(place.geo.inverseof.geo.name)
+    var geo = place.geo
+    print(geo.longitude, geo.latitude)
   })
 
   /* =>
   Place
   Tsujido
-  139.447083
-  35.336833
+  139.447083 35.336833
   Place
   Meguro
-  139.71600
-  35.633983
+  139.71600 35.633983
   */
 
   </pre>
