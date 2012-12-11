@@ -5,10 +5,28 @@
   <title>RDFa Lab Doctests</title>
   <script src="vendor/doctest.js"></script>
   <link href="vendor/doctest.css" rel="stylesheet">
+  <style>
+    body {
+      margin: auto;
+      max-width: 48em;
+    }
+    #doctest-box {
+      float: right;
+    }
+  </style>
  </head>
  <body class="autodoctest">
 
-  <h1>Places described with RDFa</h1>
+  <div id="doctest-box">
+    <p><em>(Code checked with <a href="http://doctestjs.org/">Doctest.js</a>)</em></p>
+    <div id="doctest-output"></div>
+  </div>
+
+  <h1>RDFa API Comparisons</h1>
+
+  <hr style="clear: both;"/>
+
+  <h2>Source data: Places with geo-coordinates</h2>
   <ul vocab="http://schema.org/">
     <li typeof="Place">
       <b property="name">Tsujido</b>
@@ -29,7 +47,7 @@
   <script src="../js/rdfa/parser.js"></script>
   <script src="../js/rdfa/json.js"></script>
 
-  <h2>Using JSON extraction to access the data</h2>
+  <h2>Access using JSON extraction</h2>
   <script src="../js/jsonld/core.js"></script>
   <script src="../js/ld.js"></script>
   <pre class="commenttest">
@@ -55,7 +73,7 @@
 
   </pre>
 
-  <h2>Using the Graph API to access the data</h2>
+  <h2>Access using Graph API</h2>
   <script src="../js/rdf.js"></script>
   <pre class="commenttest">
 
