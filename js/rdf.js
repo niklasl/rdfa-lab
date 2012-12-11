@@ -1,6 +1,10 @@
 (function (exports) {
 
-  var RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
+  var RDF_NS = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+  var RDF_TYPE = RDF_NS + "type";
+  var RDF_FIRST = RDF_NS + "first";
+  var RDF_REST = RDF_NS + "rest";
+  var RDF_NIL = RDF_NS + "nil";
 
 
   function Graph(mappings) {
@@ -22,7 +26,7 @@
       return result;
     },
 
-    findByType: function (/*types...*/) {
+    getByType: function (/*types...*/) {
       var result = [];
       for (var cls=null, i=0; cls=arguments[i++];) {
         result = result.concat(this.get(cls).incoming[RDF_TYPE])
@@ -56,9 +60,18 @@
   };
 
   function resolver(map) {
+    var vocab = null;
+    if (typeof map === 'string') {
+      vocab = map;
+      map = {};
+    } else {
+      vocab = map["@vocab"];
+    }
     return function (termOrCURIEorIRI) {
       var dfn = map[termOrCURIEorIRI];
-      if (dfn == undefined) {
+      if (vocab && termOrCURIEorIRI.indexOf(':') === -1) {
+        return vocab + termOrCURIEorIRI;
+      } else if (dfn == undefined) {
         var parts = termOrCURIEorIRI.split(':');
         var ns = map[parts[0]];
         if (ns !== undefined) {
@@ -66,7 +79,7 @@
         }
         return termOrCURIEorIRI;
       }
-      return (typeof dfn === 'string')? dfn : dfn[ld.ID];
+      return dfn;
     };
   }
 
@@ -87,7 +100,7 @@
   }
   Node.prototype = {
 
-    typeName: 'Node',
+    objectType: 'Node',
 
     toString: function () { return this.id; },
 
@@ -125,10 +138,10 @@
       return this.find({reverse: term});
     },
 
-    getList: function (path) {
-      var l = this.get(path)
-      return l? l.list : [];
-    },
+    //getList: function (path) {
+    //  var l = this.get(path)
+    //  return l? l.list : [];
+    //},
 
     find: function (params) {
       var result;
@@ -168,7 +181,7 @@
     },
 
     addList: function (p, list) {
-      this.add(p, new List(list));
+      this.add(p, new List(list, graph));
     },
 
     /*
@@ -189,7 +202,11 @@
   };
 
   function parsePropertyPath(path) {
-    if (path[0] === '^') {
+    if (path.indexOf('/') > -1) {
+      return {list: path.split(/\//).map(function (s) {
+        return parsePropertyPath(s.trim());
+      })};
+    } else if (path[0] === '^') {
       return {reverse: path.substring(1)};
     } else {
       return {term: path};
@@ -215,7 +232,7 @@
   }
   Literal.prototype = {
 
-    typeName: 'Literal',
+    objectType: 'Literal',
 
     toString: function () { return this.value; },
 
@@ -245,15 +262,35 @@
   };
 
 
-  function List(array) {
+  function List(array, graph) {
     this.list = array;
+    this.graph = graph;
   }
   List.prototype = {
-    typeName: 'List',
+
+    objectType: 'List',
+
     toJSON: function () {
       var o = {}; o[ld.LIST] = this.list;
       return o;
+    },
+
+    get: function (expr) {
+      var iri = this.graph.resolve(expr);
+      if (iri === RDF_FIRST) {
+        return this.list[0];
+      } else if (iri === RDF_REST) {
+        var rest = this.list.slice(1);
+        if (rest.length === 0) {
+          new Node(RDF_NIL, this.graph);
+        } else {
+          return new List(rest, this.graph);
+        }
+      } else {
+        return null;
+      }
     }
+
   };
 
 
@@ -274,7 +311,7 @@
     },
 
     importItem: function (graph, item) {
-      var node = graph.toNode(item[this.ID]); // TODO: item.getSource()
+      var node = graph.toNode(item[this.ID]);
       for (var p in item) {
         if (p === this.ID) {
           continue;
@@ -298,7 +335,9 @@
           item = {"@id": item};
         }
       }
-      if (item[this.VALUE]) {
+      if (typeof item === 'string') {
+        node.addValue(p, item);
+      } else if (item[this.VALUE]) {
         node.addValue(p, item[this.VALUE], item[this.LANG], item[this.TYPE]);
       } else if (item[this.LIST]) {
         var items = item[this.LIST],
