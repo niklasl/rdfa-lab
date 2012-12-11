@@ -17,6 +17,10 @@ See the project [wiki](https://github.com/niklasl/rdfa-lab/wiki) for details.
 This code includes parts of the JSON-LD parser by Digital Bazaar, distributed
 under a MIT license (see js/jsonld/core.js for details).
 
+The examples are tested using a local copy of
+[Doctest.js](http://doctestjs.org/) by Ian Bicking, distributed under an MIT
+license.
+
 ## License
 
 Copyright (C) 2012 Niklas Lindström
