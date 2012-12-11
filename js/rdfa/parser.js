@@ -245,7 +245,8 @@ var RDFaParser;
     }
 
     ElementData.prototype.getBase = function() {
-      return null;
+      var _ref;
+      return (_ref = this.attrs['xml:base']) != null ? _ref.value : void 0;
     };
 
     ElementData.prototype.getLang = function() {

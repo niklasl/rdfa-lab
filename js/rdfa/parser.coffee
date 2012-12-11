@@ -183,7 +183,8 @@
       @datatypeAttr = @getDatatypeAttr()
 
     getBase: ->
-      null # xml:base if XML-based profile
+      # only use if XML-based profile
+      @attrs['xml:base']?.value
 
     getLang: ->
       @attrs['xml:lang']?.value or @attrs.lang?.value
