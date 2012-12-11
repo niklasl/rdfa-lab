@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+ <head>
+  <meta charset="utf-8">
+  <title>RDFa Lab Doctests</title>
+  <script src="vendor/doctest.js"></script>
+  <link href="vendor/doctest.css" rel="stylesheet">
+ </head>
+ <body class="autodoctest">
+
+  <h1>Places described with RDFa</h1>
+  <ul vocab="http://schema.org/">
+    <li typeof="Place">
+      <b property="name">Tsujido</b>
+      <span property="geo" typeof="GeoCoordinates">
+        <span property="latitude">35.336833</span>
+        <span property="longitude">139.447083</span>
+      </div>
+    </li>
+    <li typeof="Place">
+      <b property="name">Meguro</b>
+      <span property="geo" typeof="GeoCoordinates">
+        <span property="latitude">35.633983</span>
+        <span property="longitude">139.71600</span>
+      </div>
+    </li>
+  </ul>
+
+  <script src="../js/rdfa/parser.js"></script>
+  <script src="../js/rdfa/json.js"></script>
+
+  <h2>Using JSON extraction to access the data</h2>
+  <script src="../js/jsonld/core.js"></script>
+  <script src="../js/ld.js"></script>
+  <pre class="commenttest">
+  var ctx = {
+    iri: "@id", type: "@type",
+    "@vocab": "http://schema.org/", "@language": "en"
+  }
+  var data = LD.connect(RDFaJSON.extract(document), ctx)
+  data.byType.Place.forEach(function (place) {
+    print(place.type)
+    print(place.name)
+    print(place.geo.longitude)
+    print(place.geo.latitude)
+    //print(place.geo.inverseof.geo.name)
+  })
+
+  /* =>
+  Place
+  Tsujido
+  139.447083
+  35.336833
+  Place
+  Meguro
+  139.71600
+  35.633983
+  */
+
+  </pre>
+
+  <h2>Using the Graph API to access the data</h2>
+  <script src="../js/rdf.js"></script>
+  <pre class="commenttest">
+
+  var graph = RDF.toGraph(RDFaJSON.extract(document), "http://schema.org/")
+  graph.getByType('Place').forEach(function (place) {
+    print(place.getType())
+    print(place.get('name'))
+    print(place.get('geo').get('longitude'))
+    print(place.get('geo / longitude'))
+    print(place.get('geo / latitude'))
+    print(place.get('geo').getInverseOf('geo').get('name'))
+    print(place.get('geo / ^geo / name'))
+  })
+
+  /* =>
+  http://schema.org/Place
+  Tsujido
+  139.447083
+  139.447083
+  35.336833
+  Tsujido
+  Tsujido
+  http://schema.org/Place
+  Meguro
+  139.71600
+  139.71600
+  35.633983
+  Meguro
+  Meguro
+  */
+
+  </pre>
+
+ </body>
+</html>
