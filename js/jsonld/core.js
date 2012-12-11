@@ -669,12 +669,54 @@ if(_nodejs) {
   module.exports = jsonld;
   // use node URL resolver by default
   jsonld.useUrlResolver('node');
+
+  // needed for serialization of XML literals
+  if(typeof XMLSerializer === 'undefined') {
+    var XMLSerializer = null;
+  }
+  if(typeof Node === 'undefined') {
+    var Node = {
+      ELEMENT_NODE: 1,
+      ATTRIBUTE_NODE: 2,
+      TEXT_NODE: 3,
+      CDATA_SECTION_NODE: 4,
+      ENTITY_REFERENCE_NODE: 5,
+      ENTITY_NODE: 6,
+      PROCESSING_INSTRUCTION_NODE: 7,
+      COMMENT_NODE: 8,
+      DOCUMENT_NODE: 9,
+      DOCUMENT_TYPE_NODE: 10,
+      DOCUMENT_FRAGMENT_NODE: 11,
+      NOTATION_NODE:12
+    };
+  }
 }
 
-// export browser API
-if(_browser) {
+// export AMD API
+if(typeof define === 'function' && define.amd) {
+  define('jsonld', [], function() {
+    return jsonld;
+  });
+}
+// export simple browser API
+else if(_browser) {
   window.jsonld = window.jsonld || jsonld;
 }
+
+// constants
+var XSD_BOOLEAN = 'http://www.w3.org/2001/XMLSchema#boolean';
+var XSD_DOUBLE = 'http://www.w3.org/2001/XMLSchema#double';
+var XSD_INTEGER = 'http://www.w3.org/2001/XMLSchema#integer';
+var XSD_STRING = 'http://www.w3.org/2001/XMLSchema#string';
+
+var RDF = 'http://www.w3.org/1999/02/22-rdf-syntax-ns#';
+var RDF_FIRST = RDF + 'first';
+var RDF_REST = RDF + 'rest';
+var RDF_NIL = RDF + 'nil';
+var RDF_TYPE = RDF + 'type';
+var RDF_PLAIN_LITERAL = RDF + 'PlainLiteral';
+var RDF_XML_LITERAL = RDF + 'XMLLiteral';
+var RDF_OBJECT = RDF + 'object';
 
 var MAX_CONTEXT_URLS = 10;
 
@@ -1161,11 +1203,8 @@ function _expandValue(ctx, property, value, base) {
 
   // special-case expand @id and @type (skips '@id' expansion)
   var prop = _expandTerm(ctx, property);
-  if(prop === '@id') {
+  if(prop === '@id' || prop === '@type') {
     rval = _expandTerm(ctx, value, base);
-  }
-  else if(prop === '@type') {
-    rval = _expandTerm(ctx, value);
   }
   else {
     // get type definition from context
@@ -1377,6 +1416,19 @@ function _compactIri(ctx, iri, value) {
     }
   }
 
+  // no matching terms, use @vocab if available
+  if(terms.length === 0 && ctx['@vocab']) {
+    // determine if vocab is a prefix of the iri
+    var vocab = ctx['@vocab'];
+    if(iri.indexOf(vocab) === 0) {
+      // use suffix as relative iri if it is not a term in the active context
+      var suffix = iri.substr(vocab.length);
+      if(!(suffix in ctx.mappings)) {
+        return suffix;
+      }
+    }
+  }
+
   // no term matches, add possible CURIEs
   if(terms.length === 0) {
     for(var term in ctx.mappings) {
@@ -1398,9 +1450,8 @@ function _compactIri(ctx, iri, value) {
     }
   }
 
-  // no matching terms
+  // no matching terms, use iri
   if(terms.length === 0) {
-    // use iri
     return iri;
   }
 
@@ -1449,6 +1500,30 @@ function _defineContextMapping(activeCtx, ctx, key, base, defined) {
   var value = ctx[key];
 
   if(_isKeyword(key)) {
+    // support @vocab
+    if(key === '@vocab') {
+      if(value !== null && !_isString(value)) {
+        throw new JsonLdError(
+          'Invalid JSON-LD syntax; the value of "@vocab" in a ' +
+          '@context must be a string or null.',
+          'jsonld.SyntaxError', {context: ctx});
+      }
+      if(!_isAbsoluteIri(value)) {
+        throw new JsonLdError(
+          'Invalid JSON-LD syntax; the value of "@vocab" in a ' +
+          '@context must be an absolute IRI.',
+          'jsonld.SyntaxError', {context: ctx});
+      }
+      if(value === null) {
+        delete activeCtx['@vocab'];
+      }
+      else {
+        activeCtx['@vocab'] = value;
+      }
+      defined[key] = true;
+      return;
+    }
+
     // only @language is permitted
     if(key !== '@language') {
       throw new JsonLdError(
@@ -1677,8 +1752,14 @@ function _expandContextIri(activeCtx, ctx, value, base, defined) {
     return value;
   }
 
+  // prepend vocab
+  if(ctx['@vocab']) {
+    value = _prependBase(ctx['@vocab'], value);
+  }
   // prepend base
-  value = _prependBase(base, value);
+  else {
+    value = _prependBase(base, value);
+  }
 
   // value must now be an absolute IRI
   if(!_isAbsoluteIri(value)) {
@@ -1743,8 +1824,12 @@ function _expandTerm(ctx, term, base) {
     return term;
   }
 
+  // use vocab
+  if(ctx['@vocab']) {
+    term = _prependBase(ctx['@vocab'], term);
+  }
   // prepend base to term
-  if(!_isUndefined(base)) {
+  else if(!_isUndefined(base)) {
     term = _prependBase(base, term);
   }
 
@@ -1791,7 +1876,8 @@ function _getInitialContext() {
       '@preserve': [],
       '@set': [],
       '@type': [],
-      '@value': []
+      '@value': [],
+      '@vocab': []
     }
   };
 }
@@ -1832,6 +1918,7 @@ function _isKeyword(v, ctx) {
     case '@set':
     case '@type':
     case '@value':
+    case '@vocab':
       return true;
     }
   }
@@ -1936,6 +2023,17 @@ function _isNumber(v) {
  */
 function _isDouble(v) {
   return _isNumber(v) && String(v).indexOf('.') !== -1;
+}
+
+/**
+ * Returns true if the given value is numeric.
+ *
+ * @param v the value to check.
+ *
+ * @return true if the value is numeric, false if not.
+ */
+function _isNumeric(v) {
+  return !isNaN(parseFloat(v)) && isFinite(v);
 }
 
 /**
