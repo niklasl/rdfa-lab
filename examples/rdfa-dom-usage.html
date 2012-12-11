@@ -30,38 +30,53 @@
         }
         console.log("labels", getLabels());
         document.getElementsByTagName('span')[0].attributes.property.value += " rdfs:label";
+        console.log("inserted rdfs:label");
         setTimeout(function () { console.log("labels", getLabels()); });
 
         /* Next steps...
+
+        document.rdfa.context {.vocab, .prefixes, .base, [.profile]}
+                .rdfa.context.createSubContext(vocab, prefixes)
+                .rdfa.context.expand(termOrCurie)
+                .rdfa.context.expandCurie(curie)
+                .rdfa.context.resolve(iri)
+
+        elem.rdfa // null unless element contains RDFa attributes
+            .rdfa.context
+
+            .rdfa.types // subject is subject or resource
+            .rdfa.parentSubject
+            .rdfa.subject // @resource if no predicate, or in full: @about
+            //.rdfa.activeSubject // subject or parentSubject
+            //.rdfa.nestedSubject // resource if scoped...
+
+            .rdfa.contentProperties
+            .rdfa.content
+            .rdfa.lang
+            .rdfa.datatype
+
+            .rdfa.linkProperties
+            .rdfa.resource
+            .rdfa.scoped // true unless property and ((no typeof) or about)
+
+            .rdfa.getParentSubjectElement() // null if subject
+            .rdfa.getNestedPropertyElements(optProp) // in full: this if @about + predicate
+
+            // full only:
+            .rdfa.inlist
+            .rdfa.reverseLinkProperties
+            // .. effects may be implicit unless incompleteSubject?
+            .rdfa.parentIncomplete // {.activeSubject, .linkProperties, .inlist, .incompleteSubject}
+            .rdfa.getParentIncompleteElement()
+            // .. if element is hanging predicate
+            .rdfa.incompleteSubject // same as .nestedSubject and no .resource
+            .rdfa.getCompletingElements()
 
         var seeAlso = document.rdfa.getElementsByProperty(
             "http://xmlns.com/foaf/0.1/page", {
               resource: "http://example.org/",
               content: null, lang: null, datatype: null, inlist: false });
 
-        document.rdfa.baseContext (.vocab, .prefixes, .lang, [.profile])
-                     .context.subContext(vocabStr, preficMap, langStr)
-
-        seeAlso[0].rdfa // null unless element contains RDFa attributes
-                  .rdfa.activeContext
-                  .rdfa.typeList
-                  .rdfa.propertyElements // in full: this if @about + predicate
-                  .rdfa.subject // active subject for predicates; in full: from this if @about
-                  .rdfa.subjectElement // in full: this if @about
-                  .rdfa.propertyList
-                  .rdfa.datatype
-                  .rdfa.content
-                  .rdfa.resource
-                  .rdfa.inlist // in full: from parentRe(l|v)Element if completing hanging
-                  .rdfa.about // full only
-                  .rdfa.relList // full only; from parentRe(l|v)Element if completing hanging
-                  .rdfa.revList // -||-
-                  // full only: if element is completed via a hanging predicate
-                  .rdfa.parentRelElement
-                  .rdfa.parentRevElement
-                  // full only: if element has hanging predicate
-                  .rdfa.hangingSubject
-                  .rdfa.childObjectElements
         */
 
       });
