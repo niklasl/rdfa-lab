@@ -18,7 +18,7 @@
       return this.nodes[this.resolve(termOrCURIEorIRI)];
     },
 
-    all: function () {
+    getAll: function () {
       var result = [], map = this.nodes;
       for (var id in map) {
         result.push(map[id]);
@@ -130,12 +130,12 @@
       return this.find({term: RDF_TYPE});
     },
 
-    getReverse: function (term) {
-      return this.find({reverse: term})[0];
+    getInverseOf: function (term) {
+      return this.find({inverse: term})[0];
     },
 
-    getAllReverse: function (term) {
-      return this.find({reverse: term});
+    getAllInverseOf: function (term) {
+      return this.find({inverse: term});
     },
 
     //getList: function (path) {
@@ -160,8 +160,8 @@
 
     findNodes: function (params) {
       var result;
-      if (params.reverse) {
-        var iri = this.graph.resolve(params.reverse);
+      if (params.inverse) {
+        var iri = this.graph.resolve(params.inverse);
         result = this.incoming[iri];
       } else {
         var iri = this.graph.resolve(params.term);
@@ -222,7 +222,7 @@
         return parsePropertyPath(s.trim());
       })};
     } else if (path[0] === '^') {
-      return {reverse: path.substring(1)};
+      return {inverse: path.substring(1)};
     } else {
       return {term: path};
     }
