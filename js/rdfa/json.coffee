@@ -2,6 +2,8 @@
 
   if typeof require is 'function'
     RDFaParser = require "./parser"
+  else
+     RDFaParser = window.RDFaParser
 
   RDFA_USES_VOCAB = "http://www.w3.org/ns/rdfa#usesVocabulary"
   ID = '@id'

@@ -5,6 +5,8 @@ var RDFaJSON;
   var ID, RDFA_USES_VOCAB, RDFaParser, addPropToObj, addToPropListToObj, builder, getOrCreateNode, makeLiteral;
   if (typeof require === 'function') {
     RDFaParser = require("./parser");
+  } else {
+    RDFaParser = window.RDFaParser;
   }
   RDFA_USES_VOCAB = "http://www.w3.org/ns/rdfa#usesVocabulary";
   ID = '@id';
