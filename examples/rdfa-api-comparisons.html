@@ -1,111 +1,123 @@
 <!DOCTYPE html>
 <html lang="en">
- <head>
-  <meta charset="utf-8">
-  <title>RDFa Lab Doctests</title>
-  <script src="vendor/doctest.js"></script>
-  <link href="vendor/doctest.css" rel="stylesheet">
-  <style>
-    body {
-      margin: auto;
-      max-width: 48em;
-    }
-    #doctest-box {
-      float: right;
-    }
-  </style>
- </head>
- <body class="autodoctest">
+<head>
+<meta charset="utf-8" />
+<title>RDFa Lab Doctests</title>
+<script src="vendor/doctest.js"></script>
+<link href="vendor/doctest.css" rel="stylesheet">
+<style>
+  body {
+    margin: auto;
+    max-width: 48em;
+  }
+  #doctest-box {
+    float: right;
+  }
+  hr {
+    clear: both;
+  }
+  #source {
+    display: block;
+    font-family: monospace;
+    white-space: pre;
+  }
+</style>
+</head>
+<body class="autodoctest">
 
-  <div id="doctest-box">
-    <p><em>(Code checked with <a href="http://doctestjs.org/">Doctest.js</a>)</em></p>
-    <div id="doctest-output"></div>
-  </div>
+<div id="doctest-box">
+  <p><em>(Code checked with <a href="http://doctestjs.org/">Doctest.js</a>)</em></p>
+  <div id="doctest-output"></div>
+</div>
 
-  <h1>RDFa API Comparisons</h1>
+<h1>RDFa API Comparisons</h1>
 
-  <hr style="clear: both;"/>
+<hr />
+<h2>Places with coordinates</h2>
+<div id="display" lang=""></div>
+<h2>Source</h2>
+<script id="source" type="text/html"><ul vocab="http://schema.org/">
+  <li typeof="Place">
+    <b property="name">Tsujido</b>
+    <span property="geo" typeof="GeoCoordinates">
+      <span property="latitude">35.336833</span>
+      <span property="longitude">139.447083</span>
+    </div>
+  </li>
+  <li typeof="Place">
+    <b property="name">Meguro</b>
+    <span property="geo" typeof="GeoCoordinates">
+      <span property="latitude">35.633983</span>
+      <span property="longitude">139.71600</span>
+    </div>
+  </li>
+</ul>
+</script>
+<script>
+  document.getElementById('display').innerHTML =
+    document.getElementById('source').innerHTML;
+</script>
+<hr />
 
-  <h2>Source data: Places with geo-coordinates</h2>
-  <ul vocab="http://schema.org/">
-    <li typeof="Place">
-      <b property="name">Tsujido</b>
-      <span property="geo" typeof="GeoCoordinates">
-        <span property="latitude">35.336833</span>
-        <span property="longitude">139.447083</span>
-      </div>
-    </li>
-    <li typeof="Place">
-      <b property="name">Meguro</b>
-      <span property="geo" typeof="GeoCoordinates">
-        <span property="latitude">35.633983</span>
-        <span property="longitude">139.71600</span>
-      </div>
-    </li>
-  </ul>
+<script src="../js/rdfa/parser.js"></script>
+<script src="../js/rdfa/json.js"></script>
 
-  <script src="../js/rdfa/parser.js"></script>
-  <script src="../js/rdfa/json.js"></script>
+<h2>Access using JSON extraction</h2>
+<script src="../js/jsonld/core.js"></script>
+<script src="../js/ld.js"></script>
+<pre class="commenttest">
+var ctx = {"@vocab": "http://schema.org/"}
 
-  <h2>Access using JSON extraction</h2>
-  <script src="../js/jsonld/core.js"></script>
-  <script src="../js/ld.js"></script>
-  <pre class="commenttest">
-  var ctx = {iri: "@id", type: "@type",
-    "@vocab": "http://schema.org/", "@language": "en"}
+var data = LD.connect(RDFaJSON.extract(document), ctx)
+data.byType.Place.forEach(function (place) {
+  print(place['@type'])
+  print(place.name)
+  var geo = place.geo
+  print(geo.longitude, geo.latitude)
+})
 
-  var data = LD.connect(RDFaJSON.extract(document), ctx)
-  data.byType.Place.forEach(function (place) {
-    print(place.type)
-    print(place.name)
-    var geo = place.geo
-    print(geo.longitude, geo.latitude)
-  })
+/* =>
+Place
+Tsujido
+139.447083 35.336833
+Place
+Meguro
+139.71600 35.633983
+*/
+</pre>
 
-  /* =>
-  Place
-  Tsujido
-  139.447083 35.336833
-  Place
-  Meguro
-  139.71600 35.633983
-  */
+<h2>Access using Graph API</h2>
+<script src="../js/rdf.js"></script>
+<pre class="commenttest">
+var graph = RDF.toGraph(RDFaJSON.extract(document), "http://schema.org/")
 
-  </pre>
+graph.getByType('Place').forEach(function (place) {
+  print(place.getType())
+  print(place.get('name'))
+  print(place.get('geo').get('longitude'))
+  print(place.get('geo / longitude'))
+  print(place.get('geo / latitude'))
+  print(place.get('geo').getInverseOf('geo').get('name'))
+  print(place.get('geo / ^geo / name'))
+})
 
-  <h2>Access using Graph API</h2>
-  <script src="../js/rdf.js"></script>
-  <pre class="commenttest">
+/* =>
+http://schema.org/Place
+Tsujido
+139.447083
+139.447083
+35.336833
+Tsujido
+Tsujido
+http://schema.org/Place
+Meguro
+139.71600
+139.71600
+35.633983
+Meguro
+Meguro
+*/
+</pre>
 
-  var graph = RDF.toGraph(RDFaJSON.extract(document), "http://schema.org/")
-  graph.getByType('Place').forEach(function (place) {
-    print(place.getType())
-    print(place.get('name'))
-    print(place.get('geo').get('longitude'))
-    print(place.get('geo / longitude'))
-    print(place.get('geo / latitude'))
-    print(place.get('geo').getInverseOf('geo').get('name'))
-    print(place.get('geo / ^geo / name'))
-  })
-
-  /* =>
-  http://schema.org/Place
-  Tsujido
-  139.447083
-  139.447083
-  35.336833
-  Tsujido
-  Tsujido
-  http://schema.org/Place
-  Meguro
-  139.71600
-  139.71600
-  35.633983
-  Meguro
-  Meguro
-  */
-
-  </pre>
-
- </body>
+</body>
 </html>
