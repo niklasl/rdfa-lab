@@ -59,9 +59,17 @@ var md2rdfa = new (function () {
   this.convertSdoMdExamplesToRdfa = function () {
     for (var i=0, l=document.getElementsByTagName('pre'); i < l.length; i++) {
       var el = l[i];
-      el.innerText = md2rdfa.convertText(el.innerText);
-      el.innerText = el.innerText.replace(/&nbsp;/g, ' ');
-      el.innerText = el.innerText.replace(/\s+="" /g, ' ');
+      var raw = el.innerText;
+      if (typeof raw === 'undefined') { // innerText is non-standard
+        raw = el.innerHTML.replace(/<br>/gi, "\n").replace(/(<([^>]+)>)/gi, "").replace(/\&lt;/g, "<").replace(/\&gt;/g, ">");
+      }
+      var converted = md2rdfa.convertText(raw);
+      converted = converted.replace(/&nbsp;/g, ' ').replace(/\s+="" /g, ' ');
+      if (typeof el.innerText !== 'undefined') {
+        el.innerText = converted;
+      } else {
+        el.textContent = converted;
+      }
     }
     if (typeof window.prettyPrint !== 'undefined') {
       window.prettyPrint();
