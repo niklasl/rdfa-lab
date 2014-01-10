@@ -51,9 +51,10 @@ var md2rdfa = new (function () {
 
   var convertText = this.convertText = function (raw) {
     var div = document.createElement('div');
-    div.innerHTML = raw;
+    div.innerHTML = raw.replace(/<(\/?)(html|head|title|body)/g, "<$1some-$2");
     convertElement(div);
-    return div.innerHTML;
+    var html = div.innerHTML;
+    return html.replace(/<(\/?)some-(html|head|title|body)/g, "<$1$2");
   };
 
   this.convertSdoMdExamplesToRdfa = function () {
